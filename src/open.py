@@ -3,6 +3,7 @@ from PyQt5.QtCore import pyqtSignal
 import sys
 import georasters as gr
 import numpy as np
+import pandas as pd
 
 from ui_compiled.open_dialog import Ui_OpenDialog
 
@@ -22,6 +23,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.lon, self.lat, self.r = 0., 0., 0.
 
     def connectStuff(self):
+        """Соединение элементов управление"""
         def slider_to_spin(spin):
             return lambda val: spin.setValue(val / 100)
 
@@ -43,29 +45,18 @@ class OpenDialog(QDialog, Ui_OpenDialog):
             spin.valueChanged.connect(self.params_changed)
 
     def on_open(self):
+        """Выполнить при открытии файла"""
         name, filter_ = QFileDialog.getOpenFileName(self, 'Открыть файл',
                                                     filter='*.tif')
         if len(name) > 0:
             [item.setEnabled(True) for item in self.activate]
-            self.open(name)
-
-    def open(self, name):
-        self.data = gr.from_file(name)
-        self.borders = self.get_borders(self.data)
-        self.set_controls()
-
-    def get_borders(self, data):
-        xmin, xsize, xrot, ymax, yrot, ysize = data.geot
-        self.xsize, self.ysize = xsize, ysize
-        xlen = data.count(axis=0)[0] * xsize
-        ylen = data.count(axis=1)[0] * ysize
-        xmax = xmin + xlen
-        ymin = ymax + ylen
-        return xmin, xmax, ymin, ymax
+            self.data = gr.from_file(name)
+            self.borders = self.get_borders(self.data)
+            self.set_controls()
 
     def set_controls(self):
         lonmin, lonmax, latmin, latmax = self.borders
-        lonmin_, latmin_ = int(np.ceil(lonmin)) * 100, int(np.ceil(latmin)) * 100
+        lonmin_, latmin_ = int(np.ceil(lonmin))*100, int(np.ceil(latmin))*100
         lonmax_, latmax_ = int(lonmax) * 100, int(latmax) * 100
         self.latSlider.setRange(latmin_, latmax_)
         self.lonSlider.setRange(lonmin_, lonmax_)
@@ -86,14 +77,70 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.radSpin.setRange(0, radmax)
 
     def on_params_changed(self):
+        """При всяком изменении параметров"""
+
         # TODO Примерно оперативки
         points = (self.r * 2) ** 2 / abs((self.xsize * self.ysize))
         self.pointNumber.setText(str(int(np.round(points))))
 
     def on_ok_pressed(self):
-        data = self.data.extract(self.lat, self.lon, self.r)
-        data_pd = data.to_pandas()
-        print(data_pd)
+        """При нажатии на OK"""
+        data = self.data.extract(self.lon, self.lat, self.r)
+        df = data.to_pandas()
+        df = self.calculate_normals(df)
+
+    def get_borders(self, data):
+        """Вычислить границы для GeoRaster'a
+
+        :param data: GeoRaster
+        """
+        xmin, xsize, xrot, ymax, yrot, ysize = data.geot
+        self.xsize, self.ysize = xsize, ysize
+        xlen = data.count(axis=0)[0] * xsize
+        ylen = data.count(axis=1)[0] * ysize
+        xmax = xmin + xlen
+        ymin = ymax + ylen
+        return xmin, xmax, ymin, ymax
+
+    def calculate_normals(self, df):
+        def get_normal(p1, p2, p3):
+            p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
+            v1 = p3 - p1  # Эти векторы принадлежат плоскости
+            v2 = p2 - p1
+            c = np.cross(v2, v1)  # Векторное произведение
+            c = c / np.linalg.norm(c)
+            x, y, z = c
+            return x, y, z
+
+        max_row = max(df['row'])
+        max_col = max(df['col'])
+
+        # Получить индекс элемента по строке и столбцу
+        get_index = lambda row, col: row * (max_row + 1) + col
+
+        # Хранилище нормалей
+        normals = {"n_x": [], "n_y": [], "n_z": []}
+
+        for index, row, col, value, x, y in df.itertuples():
+            # Получить соседние точки
+            target_row = row + 1 if row != max_row else row - 1
+            target_col = col + 1 if col != max_col else col - 1
+            index1 = get_index(target_row, col)
+            index2 = get_index(row, target_col)
+
+            p1 = x, y, value
+            p2, p3 = df.loc[index1], df.loc[index2]
+            p2 = p2.x, p2.y, p2.value
+            p3 = p3.x, p3.y, p3.value
+
+            # Посчитать нормаль
+            n_x, n_y, n_z = get_normal(p1, p2, p3)
+            normals["n_x"].append(n_x)
+            normals["n_y"].append(n_y)
+            normals["n_z"].append(n_z)
+
+        df = df.join(pd.DataFrame(normals))
+        return df
 
 
 if __name__ == "__main__":
