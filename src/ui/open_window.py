@@ -19,6 +19,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.setupUi(self)
         self.openButton.clicked.connect(self.on_open)
         self.previewButton.clicked.connect(self.on_preview)
+        self.saveButton.clicked.connect(self.on_save)
         self.connect_controls()
         self.params_changed.connect(self.set_rad_control)
         self.params_changed.connect(self.on_params_changed)
@@ -84,7 +85,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
     def on_preview(self):
         if not self.processor.data_plotted:
             self.init_matplotlib()
-        self.processor.draw_preview(self.lon, self.lat, self.r)
+        self.processor.draw_preview(self.lat, self.lon, self.r)
 
     def init_matplotlib(self):
         self.canvas = self.processor.init_canvas()
@@ -105,4 +106,12 @@ class OpenDialog(QDialog, Ui_OpenDialog):
     def on_ok_pressed(self):
         """При нажатии на OK"""
         df = self.processor.extract_to_pandas(self.lat, self.lon, self.r)
-        print(df)
+        print(df)  # TODO
+
+    def on_save(self):
+        filename, filter_ = QFileDialog.getSaveFileName(self, 'Сохранить',
+                                                        filter='*.tif')
+        if len(filename) > 0:
+            if not filename.endswith('.tif'):
+                filename += '.tif'
+            self.processor.save(filename, self.lat, self.lon, self.r)

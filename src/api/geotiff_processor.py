@@ -41,12 +41,17 @@ class GeoTIFFProcessor:
         self.data = gr.from_file(name)
         self.borders = self.get_borders(self.data)
 
+    def save(self, name, lat, lon, r):
+        if self.data_loaded:
+            data = self.data.extract(lon, lat, r)
+            data.to_tiff(name)
+
     def init_canvas(self):
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.fig)
         return self.canvas
 
-    def draw_preview(self, lon, lat, r):
+    def draw_preview(self, lat, lon, r):
         self.ax.cla()
         data = self.data.extract(lon, lat, r)
         data.plot(ax=self.ax)
@@ -57,6 +62,12 @@ class GeoTIFFProcessor:
         radmax = min(abs(lat - latmin), abs(lon - lonmin),
                      abs(lat - latmax), abs(lon - lonmax))
         return radmax
+
+    @property
+    def center(self):
+        lonmin, lonmax, latmin, latmax = self.borders
+        return (latmax - latmin) / 2 + latmin, \
+            (lonmax - lonmin) / 2 + lonmin
 
     def points_estimate(self, r):
         points = (r * 2)**2 / abs((self.xsize * self.ysize))

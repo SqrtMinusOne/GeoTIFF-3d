@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>651</width>
-    <height>417</height>
+    <width>924</width>
+    <height>479</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -313,6 +313,13 @@
         <widget class="QPushButton" name="closeButton">
          <property name="text">
           <string>Exit</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="saveButton">
+         <property name="text">
+          <string>Save area</string>
          </property>
         </widget>
        </item>
