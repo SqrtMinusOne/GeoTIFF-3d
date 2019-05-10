@@ -9,6 +9,7 @@ before_install:
 install:
     - pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
     - pip install -r requirements.txt
+    - mkdir src/ui_compiled
+    - for filename in ui/*.ui; do pyuic5 ${filename} --import-from res_compiled >> src/ui_compiled/${filename:3:-3}.py; done;
 script:
-    - cd src
-    - python -m unittest
+    - cd src && python -m unittest
