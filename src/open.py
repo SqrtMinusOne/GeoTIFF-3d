@@ -4,6 +4,10 @@ import sys
 import georasters as gr
 import numpy as np
 import pandas as pd
+from matplotlib.backends.backend_qt5agg import \
+    FigureCanvasQTAgg as FigureCanvas, \
+    NavigationToolbar2QT as NavigationToolbar
+from matplotlib import pyplot as plt
 
 from ui_compiled.open_dialog import Ui_OpenDialog
 
@@ -15,14 +19,16 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         super().__init__(parent)
         self.setupUi(self)
         self.openButton.clicked.connect(self.on_open)
-        self.connectStuff()
+        self.previewButton.clicked.connect(self.on_preview)
+        self.connect_controls()
         self.params_changed.connect(self.set_rad_control)
         self.params_changed.connect(self.on_params_changed)
         self.okButton.clicked.connect(self.on_ok_pressed)
         self.border = 0., 0., 0., 0.
         self.lon, self.lat, self.r = 0., 0., 0.
+        self.fig, self.data = None, None
 
-    def connectStuff(self):
+    def connect_controls(self):
         """Соединение элементов управление"""
         def slider_to_spin(spin):
             return lambda val: spin.setValue(val / 100)
@@ -32,7 +38,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
         sliders = [self.latSlider, self.lonSlider, self.radSlider]
         spins = [self.latSpin, self.lonSpin, self.radSpin]
-        self.activate = sliders + spins
+        self.activate = sliders + spins + [self.previewButton]
 
         self.latSpin.valueChanged.connect(lambda v: setattr(self, 'lat', v))
         self.lonSpin.valueChanged.connect(lambda v: setattr(self, 'lon', v))
@@ -53,6 +59,27 @@ class OpenDialog(QDialog, Ui_OpenDialog):
             self.data = gr.from_file(name)
             self.borders = self.get_borders(self.data)
             self.set_controls()
+            self.fileNameEdit.setText(name)
+
+    def on_preview(self):
+        if not self.fig:
+            self.init_matplotlib()
+        else:
+            self.ax.cla()
+        data = self.data.extract(self.lon, self.lat, self.r)
+        # x = np.arange(0, 10, 0.2)
+        # y = np.sin(x)
+        # self.ax.plot(x, y)
+        data.plot(ax=self.ax)
+        self.canvas.draw()
+
+    def init_matplotlib(self):
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        self.nav_toolbar = NavigationToolbar(self.canvas, self)
+        self.previewLayout.removeWidget(self.previewLabel)
+        self.previewLayout.addWidget(self.canvas)
+        self.previewLayout.addWidget(self.nav_toolbar)
 
     def set_controls(self):
         lonmin, lonmax, latmin, latmax = self.borders
@@ -82,6 +109,8 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         # TODO Примерно оперативки
         points = (self.r * 2) ** 2 / abs((self.xsize * self.ysize))
         self.pointNumber.setText(str(int(np.round(points))))
+        if self.autoUpdateCheckBox.isChecked() and self.data:
+            self.on_preview()
 
     def on_ok_pressed(self):
         """При нажатии на OK"""
@@ -112,11 +141,12 @@ class OpenDialog(QDialog, Ui_OpenDialog):
             x, y, z = c
             return x, y, z
 
+        # Получить индекс элемента по строке и столбцу
+        def get_index(row, col):
+            return row * (max_row + 1) + col
+
         max_row = max(df['row'])
         max_col = max(df['col'])
-
-        # Получить индекс элемента по строке и столбцу
-        get_index = lambda row, col: row * (max_row + 1) + col
 
         # Хранилище нормалей
         normals = {"n_x": [], "n_y": [], "n_z": []}

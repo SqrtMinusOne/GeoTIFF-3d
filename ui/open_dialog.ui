@@ -6,315 +6,352 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>386</height>
+    <width>651</width>
+    <height>417</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_2">
+  <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="2,3">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
+    <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
-      <widget class="QLineEdit" name="fileNameEdit">
-       <property name="readOnly">
-        <bool>true</bool>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QLineEdit" name="fileNameEdit">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Файл не открыт</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="openButton">
+         <property name="text">
+          <string>Открыть</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupBox">
+       <property name="title">
+        <string>Параметры файла</string>
        </property>
-       <property name="placeholderText">
-        <string>Файл не открыт</string>
-       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Широта:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="minLat">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>-</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="maxLat">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Долгота:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="minLon">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>-</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="maxLon">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+       </layout>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="openButton">
-       <property name="text">
-        <string>Открыть</string>
+      <widget class="QGroupBox" name="groupBox_2">
+       <property name="title">
+        <string>Выборка значений</string>
        </property>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_6">
+          <item>
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>Широта</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="latSlider">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="latSpin">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>Долгота</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="lonSlider">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="lonSpin">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <item>
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Радиус</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="radSlider">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="radSpin">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Количество точек:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="pointNumber">
+            <property name="font">
+             <font>
+              <pointsize>12</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_3">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="autoUpdateCheckBox">
+          <property name="text">
+           <string>Автоматическое обновление превью</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="groupBox">
-     <property name="title">
-      <string>Параметры файла</string>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_3">
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout">
-        <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Широта:</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="minLat">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>-</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="maxLat">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
-        <item>
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Долгота:</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="minLon">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_4">
-          <property name="text">
-           <string>-</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="maxLon">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="groupBox_2">
-     <property name="title">
-      <string>Выборка значений</string>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_6">
-        <item>
-         <widget class="QLabel" name="label_5">
-          <property name="text">
-           <string>Широта</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QSlider" name="latSlider">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QDoubleSpinBox" name="latSpin">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="singleStep">
-           <double>0.050000000000000</double>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_5">
-        <item>
-         <widget class="QLabel" name="label_6">
-          <property name="text">
-           <string>Долгота</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QSlider" name="lonSlider">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QDoubleSpinBox" name="lonSpin">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="singleStep">
-           <double>0.050000000000000</double>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_4">
-        <item>
-         <widget class="QLabel" name="label_7">
-          <property name="text">
-           <string>Радиус</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QSlider" name="radSlider">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QDoubleSpinBox" name="radSpin">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="singleStep">
-           <double>0.050000000000000</double>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_7">
-        <item>
-         <widget class="QLabel" name="label_8">
-          <property name="text">
-           <string>Количество точек:</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="pointNumber">
-          <property name="font">
-           <font>
-            <pointsize>12</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_3">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_8">
      <item>
-      <spacer name="horizontalSpacer_4">
+      <spacer name="verticalSpacer">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Vertical</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
-         <width>40</width>
-         <height>20</height>
+         <width>20</width>
+         <height>40</height>
         </size>
        </property>
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="closeButton">
-       <property name="text">
-        <string>Закрыть</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="okButton">
-       <property name="text">
-        <string>ОК</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_8">
+       <item>
+        <spacer name="horizontalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="closeButton">
+         <property name="text">
+          <string>Закрыть</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="previewButton">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>Превью</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="okButton">
+         <property name="text">
+          <string>ОК</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="previewGroupBox">
+     <property name="title">
+      <string>Предпросмотр области</string>
+     </property>
+     <layout class="QVBoxLayout" name="previewLayout">
+      <item>
+       <widget class="QLabel" name="previewLabel">
+        <property name="text">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Курсовая работа по дисциплине&lt;br/&gt;&amp;quot;Компьютерная графика&amp;quot;&lt;/span&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;Авторы: &lt;span style=&quot; font-style:italic;&quot;&gt;Корытов Павел, Пискунов Ярослав&lt;br/&gt;&lt;/span&gt;Группа: &lt;span style=&quot; font-style:italic;&quot;&gt;6304&lt;/span&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;Программа предназначена для построения трехмерной&lt;br/&gt;топографической карты по geotiff-файлам.&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;Откройте файл для начала работы. Для предпросмотра &lt;br/&gt;нажмите &amp;quot;Превью&amp;quot;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;Внимание: число точек больше TODO может &lt;br/&gt;привести к нехватке оперативной памяти&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
   </layout>
  </widget>
