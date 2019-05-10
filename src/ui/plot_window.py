@@ -1,7 +1,7 @@
 import threading
 import numpy as np
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtGui import QOpenGLShaderProgram, QOpenGLShader, QMatrix4x4, \
     QVector3D, QVector4D
 from OpenGL import GL
@@ -43,11 +43,17 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.diffuse = 0.8
 
         self.precision = 20
-        self.draw_lines = True
+        self.draw_lines = False
         self.invisible = True
 
         self.mutex = threading.Lock()
         self.shaders = QOpenGLShaderProgram()
+
+    def toggleGrabKeyboard(self, grab):
+        if grab:
+            self.grabKeyboard()
+        else:
+            self.releaseKeyboard()
 
     def getLightPos(self):
         self.light_pos = QVector3D(
@@ -144,7 +150,7 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         polygons = [[p * 0.1 + center for p in side] for side in polygons]
         return polygons, new_normals, center
 
-    def getCircleApprox(self, r, y, h, precision,
+    def getCircleApprox(self, r, y, h, precision,  # REMOVE
                         map_proc=None, map_norm=None):
         map_proc = map_proc if map_proc is not None else lambda v: v
         map_norm = map_norm if map_norm is not None else map_proc
@@ -167,7 +173,7 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
              for _ in range(4)]
         return polygons, normals
 
-    def getFlatCircleApprox(self, r1, r2, y, y_dir, p1, p2,
+    def getFlatCircleApprox(self, r1, r2, y, y_dir, p1, p2,  # REMOVE
                             map_proc=None, map_norm=None):
         map_proc = map_proc if map_proc is not None else lambda v: v
         map_norm = map_norm if map_norm is not None else map_proc
@@ -221,7 +227,7 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
 
         return normal
 
-    def getObjectCoords(self, precision=20):
+    def getObjectCoords(self, precision=20):  # FIX
         def get_carving(norm_r, carve_r, y_start, carve_h, num, precision):
             vert, hor = [], []
             for i in range(0, (num + 1)*2, 2):
@@ -375,35 +381,39 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.openGLWidget.update()
 
     def mapControls(self):
-        self.moveCameraUp.clicked.connect(lambda: self.moveCamera(y=1))
-        self.moveCameraDown.clicked.connect(lambda: self.moveCamera(y=-1))
-        self.moveCameraLeft.clicked.connect(lambda: self.moveCamera(x=-1))
-        self.moveCameraRight.clicked.connect(lambda: self.moveCamera(x=1))
-        self.moveCameraForward.clicked.connect(lambda: self.moveCamera(z=-1))
-        self.moveCameraBackward.clicked.connect(lambda: self.moveCamera(z=1))
+        # self.moveCameraUp.clicked.connect(lambda: self.moveCamera(y=1))
+        # self.moveCameraDown.clicked.connect(lambda: self.moveCamera(y=-1))
+        # self.moveCameraLeft.clicked.connect(lambda: self.moveCamera(x=-1))
+        # self.moveCameraRight.clicked.connect(lambda: self.moveCamera(x=1))
+        # self.moveCameraForward.clicked.connect(lambda: self.moveCamera(z=-1))
+        # self.moveCameraBackward.clicked.connect(lambda: self.moveCamera(z=1))
 
-        self.rotateObjectUp.clicked.connect(lambda: self.rotateObject(x=-1))
-        self.rotateObjectDown.clicked.connect(lambda: self.rotateObject(x=1))
-        self.rotateObjectLeft.clicked.connect(lambda: self.rotateObject(y=-1))
-        self.rotateObjectRight.clicked.connect(lambda: self.rotateObject(y=1))
-        self.rotateObjectForward.clicked.connect(
-            lambda: self.rotateObject(z=1))
-        self.rotateObjectBackward.clicked.connect(
-            lambda: self.rotateObject(z=-1))
+        # self.rotateObjectUp.clicked.connect(lambda: self.rotateObject(x=-1))
+        # self.rotateObjectDown.clicked.connect(lambda: self.rotateObject(x=1))
+        # self.rotateObjectLeft.clicked.connect(
+        #   lambda: self.rotateObject(y=-1))
+        # self.rotateObjectRight.clicked.connect(
+        #   lambda: self.rotateObject(y=1))
+        # self.rotateObjectForward.clicked.connect(
+        #     lambda: self.rotateObject(z=1))
+        # self.rotateObjectBackward.clicked.connect(
+        #     lambda: self.rotateObject(z=-1))
 
-        self.xScaleSpinBox.valueChanged.connect(lambda x: self.scaleView(x=x))
-        self.yScaleSpinBox.valueChanged.connect(lambda y: self.scaleView(y=y))
-        self.zScaleSpinBox.valueChanged.connect(lambda z: self.scaleView(z=z))
+        # self.xScaleSpinBox.valueChanged.connect(lambda x:self.scaleView(x=x))
+        # self.yScaleSpinBox.valueChanged.connect(lambda y:self.scaleView(y=y))
+        # self.zScaleSpinBox.valueChanged.connect(lambda z:self.scaleView(z=z))
 
-        self.xCenterSpinBox.valueChanged.connect(
-            lambda x: self.object_center.setX(x))
-        self.yCenterSpinBox.valueChanged.connect(
-            lambda y: self.object_center.setY(y))
-        self.zCenterSpinBox.valueChanged.connect(
-            lambda z: self.object_center.setZ(z))
+        # self.xCenterSpinBox.valueChanged.connect(
+        #     lambda x: self.object_center.setX(x))
+        # self.yCenterSpinBox.valueChanged.connect(
+        #     lambda y: self.object_center.setY(y))
+        # self.zCenterSpinBox.valueChanged.connect(
+        #     lambda z: self.object_center.setZ(z))
 
-        self.precisionSlider.valueChanged.connect(
-            lambda p: setattr(self, 'precision', p))
+        # self.precisionSlider.valueChanged.connect(
+        #    lambda p: setattr(self, 'precision', p))
+        self.grabKeyboardCheckBox.stateChanged.connect(
+            self.toggleGrabKeyboard)
         self.ambientSlider.valueChanged.connect(
             lambda v: setattr(self, 'ambient', v / 100))
         self.diffuseSlider.valueChanged.connect(
@@ -417,8 +427,8 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
                  self.screw_color[2],
                  a / 100)))
 
-        self.drawLinesCheckBox.stateChanged.connect(
-            lambda s: setattr(self, 'draw_lines', s))
+        # self.drawLinesCheckBox.stateChanged.connect(
+        #    lambda s: setattr(self, 'draw_lines', s))
         self.invisibleCheckBox.stateChanged.connect(
             lambda s: setattr(self, 'invisible', s))
 
@@ -441,13 +451,3 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
             self.scale_vec.setY(y)
         if z:
             self.scale_vec.setZ(z)
-
-
-if __name__ == "__main__":
-    import sys
-
-    app = QApplication(sys.argv)
-    window = PlotWindow()
-    window.show()
-
-    sys.exit(app.exec_())
