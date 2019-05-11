@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QDialog, QFileDialog
 
 from ui_compiled.open_dialog import Ui_OpenDialog
 from api import GeoTIFFProcessor
-from .plot_window import PlotWindow
+from .main_window import MainWindow
 
 
 __all__ = ['OpenDialog']
@@ -108,7 +108,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         """При нажатии на OK"""
         # df = self.processor.extract_to_pandas(self.lat, self.lon, self.r)
         # print(df)  # TODO
-        self.window = PlotWindow(self)
+        self.window = MainWindow(self)
         self.window.show()
         self.hide()
 

@@ -1,2 +1,2 @@
 from .open_window import *
-from .plot_window import *
+from .main_window import *
