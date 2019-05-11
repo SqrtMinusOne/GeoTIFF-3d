@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import QDialog, QFileDialog
 from ui_compiled.open_dialog import Ui_OpenDialog
 from api import GeoTIFFProcessor
 from .main_window import MainWindow
+from .loading_dialog import LoadingWrapper
 
 
 __all__ = ['OpenDialog']
@@ -27,6 +28,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.okButton.clicked.connect(self.on_ok_pressed)
         self.processor = GeoTIFFProcessor()
         self.lon, self.lat, self.r = 0., 0., 0.
+        self.thread = None
 
     def connect_controls(self):
         """Соединение элементов управление"""
@@ -39,7 +41,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
         sliders = [self.latSlider, self.lonSlider, self.radSlider]
         spins = [self.latSpin, self.lonSpin, self.radSpin]
-        self.activate = sliders + spins + [self.previewButton]
+        self.activate = sliders + spins + [self.previewButton, self.okButton]
 
         self.latSpin.valueChanged.connect(lambda v: setattr(self, 'lat', v))
         self.lonSpin.valueChanged.connect(lambda v: setattr(self, 'lon', v))
@@ -69,9 +71,9 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
     def set_controls(self):
         lonmin, lonmax, latmin, latmax = self.processor.borders
-        lonmin_, latmin_ = int(np.ceil(lonmin)) * 100, int(
-            np.ceil(latmin)) * 100
-        lonmax_, latmax_ = int(lonmax) * 100, int(latmax) * 100
+        lonmin_, latmin_ = int(np.ceil(lonmin * 100)), int(
+            np.ceil(latmin * 100))
+        lonmax_, latmax_ = int(lonmax * 100), int(latmax * 100)
         self.latSlider.setRange(latmin_, latmax_)
         self.lonSlider.setRange(lonmin_, lonmax_)
         self.latSpin.setRange(latmin, latmax)
@@ -106,9 +108,25 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
     def on_ok_pressed(self):
         """При нажатии на OK"""
-        # df = self.processor.extract_to_pandas(self.lat, self.lon, self.r)
-        # print(df)  # TODO
-        self.window = MainWindow(self)
+        if self.thread is None:
+            print('started kek')
+            self.thread = self.processor.ExtractThread(
+                self.processor, self.lat, self.lon, self.r, self)
+            self.loading = LoadingWrapper(self.thread)
+            self.thread.df_ready.connect(self.on_df_extracted)
+            self.loading.start()
+
+    def on_df_extracted(self, df):
+        self.loading.dialog.ready()
+        self.thread = self.processor.NormalThread(self.processor, df, self)
+        self.loading = LoadingWrapper(self.thread)
+        self.thread.df_ready.connect(self.on_normals_ready)
+        self.loading.start()
+
+    def on_normals_ready(self, df):
+        self.thread = None
+        print('stopped kek')
+        self.window = MainWindow(self.processor, df, self)
         self.window.show()
         self.hide()
 
@@ -116,6 +134,4 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         filename, filter_ = QFileDialog.getSaveFileName(self, 'Сохранить',
                                                         filter='*.tif')
         if len(filename) > 0:
-            if not filename.endswith('.tif'):
-                filename += '.tif'
             self.processor.save(filename, self.lat, self.lon, self.r)

@@ -1,3 +1,4 @@
+from PyQt5.QtCore import pyqtSignal
 import georasters as gr
 import numpy as np
 import pandas as pd
@@ -5,10 +6,73 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt5agg import \
     FigureCanvasQTAgg as FigureCanvas
 
+from loading_wrapper import LoadingThread
+
+
 __all__ = ['GeoTIFFProcessor']
 
 
 class GeoTIFFProcessor:
+    class ExtractThread(LoadingThread):
+        df_ready = pyqtSignal(object)
+
+        def __init__(self, proc, lat, lon, r, parent=None):
+            super().__init__(parent)
+            self.proc = proc
+            self.args = lon, lat, r
+            self.operation = 'Извлечение информации'
+            self.df = None
+
+        def run(self):
+            data = self.proc.data.extract(*self.args)
+            df = data.to_pandas()
+            self.df = df
+            self.df_ready.emit(df)
+            self.loadingDone.emit()
+
+    class NormalThread(LoadingThread):
+        df_ready = pyqtSignal(object)
+
+        def __init__(self, proc, df, parent=None):
+            super().__init__(parent)
+            self.operation = 'Вычисление нормалей'
+            self.set_interval(len(df))
+            self.proc = proc
+            self.df = df
+
+        def run(self):
+            def get_normal(p1, p2, p3):
+                p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
+                v1 = p3 - p1  # Эти векторы принадлежат плоскости
+                v2 = p2 - p1
+                c = np.cross(v2, v1)  # Векторное произведение
+                c = c / np.linalg.norm(c)
+                x, y, z = c
+                return x, y, z
+            df = self.df
+
+            max_row = max(df['row'])
+            max_col = max(df['col'])
+
+            # Хранилище нормалей
+            normals = {"n_x": [], "n_y": [], "n_z": []}
+
+            for index, row, col, value, x, y in df.itertuples():
+                self.check_percent(index)
+                polygon, border = self.proc.get_polygon(row, col, max_row,
+                                                        max_col, df)
+                p1, p2, p3, p4 = polygon
+                # Посчитать нормаль
+                n_x, n_y, n_z = get_normal(p1, p2, p3)
+                normals["n_x"].append(n_x)
+                normals["n_y"].append(n_y)
+                normals["n_z"].append(n_z)
+
+            df = df.join(pd.DataFrame(normals))
+            self.df = df
+            self.df_ready.emit(self.df)
+            self.loadingDone.emit()
+
     def __init__(self):
         self.data = None
         self.fig, self.ax = None, None
@@ -59,8 +123,8 @@ class GeoTIFFProcessor:
 
     def max_rad(self, lat, lon):
         lonmin, lonmax, latmin, latmax = self.borders
-        radmax = min(abs(lat - latmin), abs(lon - lonmin),
-                     abs(lat - latmax), abs(lon - lonmax))
+        radmax = min(abs(lat - latmin), abs(lon - lonmin), abs(lat - latmax),
+                     abs(lon - lonmax))
         return radmax
 
     @property
@@ -74,48 +138,49 @@ class GeoTIFFProcessor:
         return points
 
     def extract_to_pandas(self, lat, lon, r):
-        data = self.data.extract(lon, lat, r)
-        df = data.to_pandas()
-        df = self.calculate_normals(df)
-        return df
+        thread = self.ExtractThread(self, lat, lon, r)
+        thread.run()
+        thread.wait()
+        return thread.df
 
     def calculate_normals(self, df):
-        def get_normal(p1, p2, p3):
-            p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
-            v1 = p3 - p1  # Эти векторы принадлежат плоскости
-            v2 = p2 - p1
-            c = np.cross(v2, v1)  # Векторное произведение
-            c = c / np.linalg.norm(c)
-            x, y, z = c
-            return x, y, z
+        thread = self.NormalThread(self, df)
+        thread.run()
+        thread.wait()
+        return thread.df
 
+    def get_polygon(self, row, col, max_row, max_col, df):
         # Получить индекс элемента по строке и столбцу
-        def get_index(row, col):
+        def get_index(row, col, max_row):
             return row * (max_row + 1) + col
 
+        # Получить соседние точки
+        # Точка (i, j) - нормаль для полигона (i, j), (i+1, j), (i+1, j+1),
+        # (i,j+1)
+        target_row = row + 1 if row != max_row else row - 1
+        target_col = col + 1 if col != max_col else col - 1
+        index0 = get_index(row, col, max_row)
+        index1 = get_index(target_row, col, max_row)
+        index2 = get_index(row, target_col, max_row)
+        index3 = get_index(target_row, target_col, max_row)
+
+        border = False
+        if target_row < row or target_col < col:
+            border = True
+
+        indices = (index0, index1, index3, index2)
+        points = []
+        for index in indices:
+            point = df.loc[index]
+            points.append((point.x, point.y, point.value))
+        return points, border
+
+    def polygon_generator(self, df):
         max_row = max(df['row'])
         max_col = max(df['col'])
-
-        # Хранилище нормалей
-        normals = {"n_x": [], "n_y": [], "n_z": []}
-
-        for index, row, col, value, x, y in df.itertuples():
-            # Получить соседние точки
-            target_row = row + 1 if row != max_row else row - 1
-            target_col = col + 1 if col != max_col else col - 1
-            index1 = get_index(target_row, col)
-            index2 = get_index(row, target_col)
-
-            p1 = x, y, value
-            p2, p3 = df.loc[index1], df.loc[index2]
-            p2 = p2.x, p2.y, p2.value
-            p3 = p3.x, p3.y, p3.value
-
-            # Посчитать нормаль
-            n_x, n_y, n_z = get_normal(p1, p2, p3)
-            normals["n_x"].append(n_x)
-            normals["n_y"].append(n_y)
-            normals["n_z"].append(n_z)
-
-        df = df.join(pd.DataFrame(normals))
-        return df
+        for i, row, col, value, x, y, n_x, n_y, n_z in df.itertuples():
+            polygon, border = self.get_polygon(row, col, max_row, max_col, df)
+            if border:
+                continue
+            normal = (n_x, n_y, n_z)
+            yield polygon, normal

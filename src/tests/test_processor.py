@@ -49,4 +49,5 @@ class TestGeoTIFFProcessor(unittest.TestCase):
         lat, lon = proc.center
         r = proc.max_rad(lat, lon) / 2
         df = proc.extract_to_pandas(lat, lon, r)
+        df = proc.calculate_normals(df)
         self.assertGreater(len(df), 0)

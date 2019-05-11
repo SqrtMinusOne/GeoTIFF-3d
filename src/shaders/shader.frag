@@ -8,6 +8,7 @@ precision mediump float;
 uniform vec3 LightPos;
 uniform float ambientStrength;
 uniform float diffuseStrength;
+uniform float alpha;
 uniform bool phongModel;
 
 in vec4 Color;
@@ -28,7 +29,7 @@ void main() {
         vec4 diffuse = diff * diffuseStrength * lightColor;
 
         vec4 result = (ambient + diffuse) * Color;
-        result.a = Color.a;
+        result.a = alpha;
 
         fragColor = result;
     }

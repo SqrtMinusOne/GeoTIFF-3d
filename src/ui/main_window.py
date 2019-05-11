@@ -1,19 +1,20 @@
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtGui import QVector3D, QOpenGLShaderProgram, QOpenGLShader, \
-    QMatrix4x4, QVector4D, QCursor
+    QMatrix4x4, QVector4D, QCursor, QColor
 from OpenGL import GL
 import numpy as np
 
 from ui_compiled.mainwindow import Ui_MainWindow
 
-
 __all__ = ['MainWindow']
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, processor, df, parent=None):
         super().__init__(parent)
+        self.processor = processor
+        self.df = df
         self.setupUi(self)
         self.setupControls()
         self.keyPressEvent = self.keyPressed
@@ -37,9 +38,55 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.alpha = self.alphaSlider.value() / 100
         self.draw_invisible = self.invisibleCheckBox.isChecked()
 
+        self.polygons = []
+        self.normals = []
+        self.colors = []
+        self.min_val = self.max_val = 0
+        self.min_lon = self.max_lon = self.min_lat = self.max_lat = 0
+        self.val_lon_proportion = 1  # TODO?
+        self.setPolygons()
+
         self.shaders = QOpenGLShaderProgram()
         self.openGLWidget.initializeGL = self.initializeGL
         self.openGLWidget.paintGL = self.paintGL
+
+    def getColorByValue(self, value):
+        value = (self.max_val - value) / (self.max_val - self.min_val)
+        hue = 120 * value / 360
+        color = QColor.fromHslF(hue, 1, 0.5)
+        color_vec = QVector4D(color.redF(), color.greenF(), color.blueF(), 0.5)
+        return color_vec
+
+    def setPolygons(self):
+        self.min_lon = min(self.df['x'])
+        self.max_lon = max(self.df['x'])
+        self.min_lat = min(self.df['y'])
+        self.max_lat = max(self.df['y'])
+        self.min_val = min(self.df['value'])
+        self.max_val = max(self.df['value'])
+        for polygon, normal in self.processor.polygon_generator(self.df):
+            self.polygons.append(self.normalizePolygon(polygon))
+            [self.normals.append(QVector3D(*normal)) for _ in polygon]
+            [self.colors.append(self.getColorByValue(val))
+             for x, y, val in polygon]
+
+    def normalizePolygon(self, polygon):
+        normalized = []
+        for lon, lat, value in polygon:
+            lon_ = self.normalizeLon(lon)
+            lat_ = self.normalizeLat(lat)
+            value_ = self.normalizeValue(value) * self.val_lon_proportion
+            normalized.append((lon_, value_, lat_))
+        return normalized
+
+    def normalizeLat(self, lat):
+        return (lat - self.min_lat) / (self.max_lat - self.min_lat)
+
+    def normalizeLon(self, lon):
+        return (lon - self.min_lon) / (self.max_lon - self.min_lon)
+
+    def normalizeValue(self, value):
+        return (value - self.min_val) / (self.max_val - self.min_val)
 
     def updateGL(func):
         def wrapper(self, *args, **kwargs):
@@ -92,8 +139,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             Qt.Key_S: {'z': -1},
             Qt.Key_A: {'x': -1},
             Qt.Key_D: {'x': 1},
-            Qt.Key_Shift: {'y': 1},
-            Qt.Key_Control: {'y': -1},
+            Qt.Key_Z: {'y': 1},
+            Qt.Key_X: {'y': -1},
             Qt.Key_Up: {'az': 1},
             Qt.Key_Down: {'az': -1},
             Qt.Key_Left: {'pol': 1},
@@ -126,11 +173,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                                              'shaders/shader.frag')
         self.shaders.link()
         self.shaders.bind()
-        self.updateMatrices()
+
+    def updateMatrices(self):
+        proj = QMatrix4x4()
+        if self.perspectiveRadioButton.isChecked():
+            proj.frustum(-0.3, 1, -0.3, 1, 2, 20)
+        else:
+            proj.ortho(-0.3, 1, -0.3, 1, 2, 20)
+        modelview = QMatrix4x4()
+        modelview.lookAt(
+            self.camera_pos,
+            self.camera_pos + self.camera_rot,
+            QVector3D(0, 1, 0)
+        )
+        self.shaders.setUniformValue("ModelViewMatrix", modelview)
+        self.shaders.setUniformValue("MVP", proj * modelview)
+
+    def updateParams(self):
+        self.shaders.setUniformValue("LightPos", self.light_pos)
+        self.shaders.setUniformValue("ambientStrength", self.ambient)
+        self.shaders.setUniformValue("diffuseStrength", self.diffuse)
+        self.shaders.setUniformValue("alpha", self.alpha)
 
     def paintGL(self):
         self.loadScene()
         self.updateMatrices()
+        self.updateParams()
         self.drawScene()
 
     def loadScene(self):
@@ -145,26 +213,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             GL.glDisable(GL.GL_DEPTH_TEST)
 
-    def updateMatrices(self):
-        proj = QMatrix4x4()
-        if self.perspectiveRadioButton.isChecked():
-            proj.frustum(-0.3, 1, -0.3, 1, 2, 20)
-        else:
-            proj.ortho(-0.3, 1, -0.3, 1, 2, 20)
-        modelview = QMatrix4x4()
-        modelview.lookAt(
-            self.camera_pos,
-            self.camera_pos + self.camera_rot,
-            QVector3D(0, 1, 0)
-        )
-
-        self.shaders.setUniformValue("ModelViewMatrix", modelview)
-        self.shaders.setUniformValue("MVP", proj * modelview)
-        self.shaders.setUniformValue("LightPos", self.light_pos)
-
     def drawScene(self):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         self.drawLightSource()
+        self.drawCoordSystem()
+        self.drawMap()
 
     def drawLightSource(self):
         polygons, normals, colors = self.getLightSourceCoords()
@@ -201,12 +254,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         colors = []
         [colors.append(QVector4D(1, 153 / 255, 0, 0.5) * self.diffuse)
-         for _ in range(len(polygons) * 4)]
+         for _ in range(len(normals_vec))]
         return polygons, normals_vec, colors
+
+    def drawMap(self):
+        self.shaders.setUniformValue('phongModel', True)
+        self.drawPolygons(self.polygons, self.normals, self.colors)
 
     def drawPolygons(self, polygons, normals, colors):
         self.shaders.setAttributeArray("v_color", colors)
         self.shaders.enableAttributeArray("v_color")
+        self.shaders.setAttributeArray("v_normal", normals)
+        self.shaders.enableAttributeArray("v_normal")
         GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
 
         coords_array = []
@@ -220,22 +279,48 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
 
+    def drawCoordSystem(self):
+        coords = (
+            ((0, 0, -100), (0, 0, 100)),
+            ((-100, 0, 0), (100, 0, 0)),
+            ((0, -100, 0), (0, 100, 0))
+        )
+        coords_array = []
+        line_colors = []
+        [line_colors.append(QVector4D(1, 1, 1, 1))
+         for _ in range(len(coords) * 2)]
+        [[coords_array.append(p) for p in line] for line in coords]
+
+        GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
+        self.shaders.setAttributeArray("v_color", line_colors)
+        self.shaders.setUniformValue("phongModel", False)
+        GL.glVertexPointer(3, GL.GL_FLOAT, 0, coords_array)
+        for i in range(len(coords)):
+            start_index = i * 2
+            GL.glDrawArrays(GL.GL_LINES, start_index, 2)
+
+        GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
+
     @updateGL
     def moveCamera(self, az=0, pol=0, x=0, y=0, z=0):
         move_coef = 0.1
         rot_coef = 2
 
+        rot_matr = QMatrix4x4()
+        rot_matr.rotate(-90, 0, 1, 0)
+        rot_vec = QVector3D(self.camera_rot)
+        rot_vec.setY(0)
+        rot_vec = rot_matr * rot_vec
+
         if az != 0 or pol != 0:
             rot_matr = QMatrix4x4()
-            rot_matr.rotate(rot_coef * az, 1, 0, 0)
+            rot_matr.rotate(rot_coef * az, rot_vec)
             rot_matr.rotate(rot_coef * pol, 0, 1, 0)
             self.camera_rot = rot_matr * self.camera_rot
         if z:
             self.camera_pos += move_coef * self.camera_rot * z
         if x:
-            rot_matr = QMatrix4x4()
-            rot_matr.rotate(-90, 0, 1, 0)
-            self.camera_pos += rot_matr * self.camera_rot * move_coef * x
+            self.camera_pos += rot_matr * rot_vec * move_coef * x
         if y:
             self.camera_pos.setY(self.camera_pos.y() + y * move_coef)
 
