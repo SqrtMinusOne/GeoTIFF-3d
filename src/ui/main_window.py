@@ -177,8 +177,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def prepareLines(self, lines, line_colors):
         assert len(lines) == len(line_colors)
         start = len(self.coords_array)
-        [self.prepareLine(line, colors)
-         for line, colors in zip(lines, line_colors)]
+        [
+            self.prepareLine(line, colors)
+            for line, colors in zip(lines, line_colors)
+        ]
         end = len(self.coords_array)
         return start, end
 
@@ -283,7 +285,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             GL.glDrawArrays(GL.GL_POLYGON, i, 4)
 
     def drawPreparedLines(self, start, end):
-        GL.glDrawArrays(GL.GL_LINES, start, end-start)
+        GL.glDrawArrays(GL.GL_LINES, start, end - start)
 
     # ==================== CONTROLS ====================
     def setupControls(self):

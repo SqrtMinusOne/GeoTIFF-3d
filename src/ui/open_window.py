@@ -4,11 +4,11 @@ from matplotlib.backends.backend_qt5agg import \
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QDialog, QFileDialog
 
-from ui_compiled.open_dialog import Ui_OpenDialog
 from api import GeoTIFFProcessor
-from .main_window import MainWindow
-from .loading_dialog import LoadingWrapper
+from ui_compiled.open_dialog import Ui_OpenDialog
 
+from .loading_dialog import LoadingWrapper
+from .main_window import MainWindow
 
 __all__ = ['OpenDialog']
 
@@ -28,6 +28,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.okButton.clicked.connect(self.on_ok_pressed)
         self.processor = GeoTIFFProcessor()
         self.lon, self.lat, self.r = 0., 0., 0.
+        self.coef = 1.
         self.thread = None
 
     def connect_controls(self):
@@ -46,17 +47,27 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.latSpin.valueChanged.connect(lambda v: setattr(self, 'lat', v))
         self.lonSpin.valueChanged.connect(lambda v: setattr(self, 'lon', v))
         self.radSpin.valueChanged.connect(lambda v: setattr(self, 'r', v))
+        self.resSpin.valueChanged.connect(lambda v: setattr(self, 'coef', v))
 
         for slider, spin in zip(sliders, spins):
             slider.valueChanged.connect(slider_to_spin(spin))
             spin.valueChanged.connect(spin_to_slider(slider))
             spin.valueChanged.connect(self.params_changed)
             slider.valueChanged.connect(self.params_changed)
+        self.resSpin.valueChanged.connect(self.params_changed)
 
     def set_rad_control(self):
         radmax = self.processor.max_rad(self.lat, self.lon)
         self.radSlider.setRange(0, int(radmax * 100))
         self.radSpin.setRange(0, radmax)
+
+    def proc_params(self):
+        return {
+            'lat': self.lat,
+            'lon': self.lon,
+            'r': self.r,
+            'coef': self.coef
+        }
 
     def on_open(self):
         """Выполнить при открытии файла"""
@@ -88,7 +99,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
     def on_preview(self):
         if not self.processor.data_plotted:
             self.init_matplotlib()
-        self.processor.draw_preview(self.lat, self.lon, self.r)
+        self.processor.draw_preview(**self.proc_params())
 
     def init_matplotlib(self):
         self.canvas = self.processor.init_canvas()
@@ -99,10 +110,18 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
     def on_params_changed(self):
         """При всяком изменении параметров
-        TODO Примерно оперативки
         """
-        points = self.processor.points_estimate(self.r)
+        points = self.processor.points_estimate(self.r, self.coef)
         self.pointNumber.setText(str(int(np.round(points))))
+
+        ram = self.processor.df_size_estimate(self.r, self.coef)
+        prefixes = ['B', 'KB', 'MB', 'GB', 'TB']
+        prefix = 0
+        while ram > 1024:
+            ram /= 1024
+            prefix += 1
+        self.ramUsage.setText(f"{ram:.2f} {prefixes[prefix]}")
+
         if self.autoUpdateCheckBox.isChecked() and self.processor.data_loaded:
             self.on_preview()
 
@@ -110,7 +129,7 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         """При нажатии на OK"""
         if self.thread is None:
             self.thread = self.processor.PreprocessThread(
-                self.processor, self.lat, self.lon, self.r, self)
+                self.processor, self, **self.proc_params())
             self.loading = LoadingWrapper(self.thread)
             self.thread.df_ready.connect(self.on_normals_ready)
             self.loading.start()
@@ -122,7 +141,8 @@ class OpenDialog(QDialog, Ui_OpenDialog):
         self.hide()
 
     def on_save(self):
-        filename, filter_ = QFileDialog.getSaveFileName(self, 'Сохранить',
+        filename, filter_ = QFileDialog.getSaveFileName(self,
+                                                        'Сохранить',
                                                         filter='*.tif')
         if len(filename) > 0:
-            self.processor.save(filename, self.lat, self.lon, self.r)
+            self.processor.save(filename, **self.proc_params())

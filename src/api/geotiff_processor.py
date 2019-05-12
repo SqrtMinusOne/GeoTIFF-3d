@@ -1,13 +1,12 @@
-from PyQt5.QtCore import pyqtSignal
 import georasters as gr
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt5agg import \
     FigureCanvasQTAgg as FigureCanvas
+from PyQt5.QtCore import pyqtSignal
 
 from loading_wrapper import LoadingThread
-
 
 __all__ = ['GeoTIFFProcessor']
 
@@ -16,14 +15,15 @@ class GeoTIFFProcessor:
     class PreprocessThread(LoadingThread):
         df_ready = pyqtSignal(object)
 
-        def __init__(self, proc, lat, lon, r, parent=None):
+        def __init__(self, proc, parent=None, *args, **kwargs):
             super().__init__(parent)
             self.operation = 'Data processing'
             self.proc = proc
-            self.args = lat, lon, r
+            self.args = args
+            self.kwargs = kwargs
             self.df = None
 
-        def run(self):
+        def run(self, df=None):
             def get_normal(p1, p2, p3):
                 p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
                 v1 = p3 - p1  # Эти векторы принадлежат плоскости
@@ -34,10 +34,11 @@ class GeoTIFFProcessor:
                 return x, y, z
 
             # Extraction
-            df = self.proc.extract_to_pandas(*self.args)
+            if df is None:
+                df = self.proc.extract_to_pandas(*self.args, **self.kwargs)
 
-            self.updateStatus.emit('Calulating normals')
-            self.set_interval(len(df))
+                self.updateStatus.emit('Calulating normals')
+                self.set_interval(len(df))
 
             # Getting normals
             max_row = max(df['row'])
@@ -48,8 +49,8 @@ class GeoTIFFProcessor:
 
             for index, row, col, value, x, y in df.itertuples():
                 self.check_percent(index)
-                polygon, border = self.proc.get_polygon(row, col, max_row,
-                                                        max_col, df)
+                polygon, border = self.proc.get_polygon(
+                    row, col, max_row, max_col, df)
                 p1, p2, p3, p4 = polygon
                 # Посчитать нормаль
                 n_x, n_y, n_z = get_normal(p1, p2, p3)
@@ -69,6 +70,7 @@ class GeoTIFFProcessor:
         self.xsize, self.ysize = 0, 0
         self.canvas = None
 
+    # ==================== STATE ====================
     @property
     def data_loaded(self):
         return self.data is not None
@@ -77,11 +79,13 @@ class GeoTIFFProcessor:
     def data_plotted(self):
         return self.fig is not None
 
-    def get_borders(self, data):
+    # ==================== DATA PROPERTIES ====================
+    def get_borders(self, data=None):
         """Вычислить границы для GeoRaster'a
 
         :param data: GeoRaster
         """
+        data = self.data if data is None else data
         xmin, xsize, xrot, ymax, yrot, ysize = data.geot
         self.xsize, self.ysize = xsize, ysize
         xlen = data.count(axis=0)[0] * xsize
@@ -90,25 +94,11 @@ class GeoTIFFProcessor:
         ymin = ymax + ylen
         return xmin, xmax, ymin, ymax
 
-    def open_file(self, name):
-        self.data = gr.from_file(name)
-        self.borders = self.get_borders(self.data)
-
-    def save(self, name, lat, lon, r):
-        if self.data_loaded:
-            data = self.data.extract(lon, lat, r)
-            data.to_tiff(name)
-
-    def init_canvas(self):
-        self.fig, self.ax = plt.subplots()
-        self.canvas = FigureCanvas(self.fig)
-        return self.canvas
-
-    def draw_preview(self, lat, lon, r):
-        self.ax.cla()
-        data = self.data.extract(lon, lat, r)
-        data.plot(ax=self.ax)
-        self.canvas.draw()
+    def get_dimensions(self, data=None):
+        data = self.data if data is None else data
+        xlen = data.count(axis=0)[0]
+        ylen = data.count(axis=1)[0]
+        return xlen, ylen
 
     def max_rad(self, lat, lon):
         lonmin, lonmax, latmin, latmax = self.borders
@@ -122,17 +112,35 @@ class GeoTIFFProcessor:
         return (latmax - latmin) / 2 + latmin, \
             (lonmax - lonmin) / 2 + lonmin
 
-    def points_estimate(self, r):
-        points = (r * 2)**2 / abs((self.xsize * self.ysize))
+    def points_estimate(self, r, coef=1):
+        xlen, ylen = self.get_dimensions()
+        points = xlen * ylen
+        points *= (r / self.max_rad(*self.center))**2
+        points *= coef
+        points = int(np.ceil(points))
         return points
 
-    def extract_to_pandas(self, lat, lon, r):
-        data = self.data.extract(lon, lat, r)
+    def df_size_estimate(self, *args, **kwargs):
+        return self.points_estimate(*args, **kwargs) * 58 + 80
+
+    # ==================== DATA PROCESSING & PANDAS ====================
+    def _modify_data(self, lat=None, lon=None, r=None, coef=1):
+        data = self.data
+        if lat and lon and r:
+            data = self.data.extract(lon, lat, r)
+        if coef != 1:
+            xlen, ylen = self.get_dimensions(data)
+            new_shape = (int(xlen * coef), int(ylen * coef))
+            data = data.resize(new_shape, cval=True)
+        return data
+
+    def extract_to_pandas(self, *args, **kwargs):
+        data = self._modify_data(*args, **kwargs)
         return data.to_pandas()
 
     def calculate_normals(self, df):
-        thread = self.PreprocessThread(self, df)
-        thread.run()
+        thread = self.PreprocessThread(self)
+        thread.run(df)
         thread.wait()
         return thread.df
 
@@ -171,3 +179,24 @@ class GeoTIFFProcessor:
                 continue
             normal = (n_x, n_y, n_z)
             yield polygon, normal
+
+    # ==================== FILES & MPL ====================
+    def open_file(self, name):
+        self.data = gr.from_file(name)
+        self.borders = self.get_borders(self.data)
+
+    def save(self, name, *args, **kwargs):
+        if self.data_loaded:
+            data = self._modify_data(*args, **kwargs)
+            data.to_tiff(name)
+
+    def init_canvas(self):
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        return self.canvas
+
+    def draw_preview(self, *args, **kwargs):
+        self.ax.cla()
+        data = self._modify_data(*args, **kwargs)
+        data.plot(ax=self.ax)
+        self.canvas.draw()

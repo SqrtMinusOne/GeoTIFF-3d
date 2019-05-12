@@ -1,15 +1,15 @@
-import unittest
 import os
 import shutil
+import unittest
+
+import numpy as np
 
 from api import GeoTIFFProcessor
-
 
 SAMPLE_NAME = '../samples/everest.tif'
 
 
 class TestGeoTIFFProcessor(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         if not os.path.exists('_temp'):
@@ -36,6 +36,10 @@ class TestGeoTIFFProcessor(unittest.TestCase):
         r = proc.max_rad(lat, lon)
         self.assertGreater(r, 0)
 
+        xlen, ylen = proc.get_dimensions()
+        self.assertLessEqual(
+            np.abs(xlen * ylen - proc.points_estimate(r, 1)), 1)
+
     def test_save(self):
         proc = GeoTIFFProcessor()
         proc.open_file(SAMPLE_NAME)
@@ -43,11 +47,45 @@ class TestGeoTIFFProcessor(unittest.TestCase):
         r = proc.max_rad(lat, lon) / 2
         proc.save('_temp/temp.tif', lat, lon, r)
 
-    def test_pandas(self):
+    def test_modify(self):
+        proc = GeoTIFFProcessor()
+        proc.open_file(SAMPLE_NAME)
+
+        # Crop
+        lat, lon = proc.center
+        r = proc.max_rad(lat, lon) / 2
+        data = proc._modify_data(lat, lon, r, 1)
+        xlen_old, ylen_old = proc.get_dimensions()
+        xlen, ylen = proc.get_dimensions(data)
+        self.assertLessEqual(np.abs(xlen_old / 2 - xlen), 1)
+        self.assertLessEqual(np.abs(ylen_old / 2 - ylen), 1)
+
+        # Make smaller
+        r = proc.max_rad(lat, lon)
+        data = proc._modify_data(lat, lon, r, 0.5)
+        xlen, ylen = proc.get_dimensions(data)
+        self.assertLessEqual(np.abs(xlen_old / 2 - xlen), 1)
+        self.assertLessEqual(np.abs(ylen_old / 2 - ylen), 1)
+
+        # Make larger (interpolate)
+        data = proc._modify_data(lat, lon, r, 2)
+        xlen, ylen = proc.get_dimensions(data)
+        self.assertLessEqual(np.abs(xlen_old * 2 - xlen), 1)
+        self.assertLessEqual(np.abs(ylen_old * 2 - ylen), 1)
+
+    def test_to_pandas(self):
         proc = GeoTIFFProcessor()
         proc.open_file(SAMPLE_NAME)
         lat, lon = proc.center
         r = proc.max_rad(lat, lon) / 2
         df = proc.extract_to_pandas(lat, lon, r)
+
         df = proc.calculate_normals(df)
         self.assertGreater(len(df), 0)
+
+        points = proc.points_estimate(r)
+        self.assertLessEqual(np.abs(len(df) - points), points / 100)
+
+        memory = sum(df.memory_usage())
+        self.assertLessEqual(
+            np.abs(proc.df_size_estimate(r) - memory), memory / 100)
