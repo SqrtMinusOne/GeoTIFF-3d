@@ -13,32 +13,15 @@ __all__ = ['GeoTIFFProcessor']
 
 
 class GeoTIFFProcessor:
-    class ExtractThread(LoadingThread):
+    class PreprocessThread(LoadingThread):
         df_ready = pyqtSignal(object)
 
         def __init__(self, proc, lat, lon, r, parent=None):
             super().__init__(parent)
+            self.operation = 'Data processing'
             self.proc = proc
-            self.args = lon, lat, r
-            self.operation = 'Извлечение информации'
+            self.args = lat, lon, r
             self.df = None
-
-        def run(self):
-            data = self.proc.data.extract(*self.args)
-            df = data.to_pandas()
-            self.df = df
-            self.df_ready.emit(df)
-            self.loadingDone.emit()
-
-    class NormalThread(LoadingThread):
-        df_ready = pyqtSignal(object)
-
-        def __init__(self, proc, df, parent=None):
-            super().__init__(parent)
-            self.operation = 'Вычисление нормалей'
-            self.set_interval(len(df))
-            self.proc = proc
-            self.df = df
 
         def run(self):
             def get_normal(p1, p2, p3):
@@ -49,8 +32,14 @@ class GeoTIFFProcessor:
                 c = c / np.linalg.norm(c)
                 x, y, z = c
                 return x, y, z
-            df = self.df
 
+            # Extraction
+            df = self.proc.extract_to_pandas(*self.args)
+
+            self.updateStatus.emit('Calulating normals')
+            self.set_interval(len(df))
+
+            # Getting normals
             max_row = max(df['row'])
             max_col = max(df['col'])
 
@@ -138,13 +127,11 @@ class GeoTIFFProcessor:
         return points
 
     def extract_to_pandas(self, lat, lon, r):
-        thread = self.ExtractThread(self, lat, lon, r)
-        thread.run()
-        thread.wait()
-        return thread.df
+        data = self.data.extract(lon, lat, r)
+        return data.to_pandas()
 
     def calculate_normals(self, df):
-        thread = self.NormalThread(self, df)
+        thread = self.PreprocessThread(self, df)
         thread.run()
         thread.wait()
         return thread.df

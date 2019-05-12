@@ -109,23 +109,14 @@ class OpenDialog(QDialog, Ui_OpenDialog):
     def on_ok_pressed(self):
         """При нажатии на OK"""
         if self.thread is None:
-            print('started kek')
-            self.thread = self.processor.ExtractThread(
+            self.thread = self.processor.PreprocessThread(
                 self.processor, self.lat, self.lon, self.r, self)
             self.loading = LoadingWrapper(self.thread)
-            self.thread.df_ready.connect(self.on_df_extracted)
+            self.thread.df_ready.connect(self.on_normals_ready)
             self.loading.start()
-
-    def on_df_extracted(self, df):
-        self.loading.dialog.ready()
-        self.thread = self.processor.NormalThread(self.processor, df, self)
-        self.loading = LoadingWrapper(self.thread)
-        self.thread.df_ready.connect(self.on_normals_ready)
-        self.loading.start()
 
     def on_normals_ready(self, df):
         self.thread = None
-        print('stopped kek')
         self.window = MainWindow(self.processor, df, self)
         self.window.show()
         self.hide()

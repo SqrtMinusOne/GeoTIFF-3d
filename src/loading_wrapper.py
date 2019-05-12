@@ -7,6 +7,7 @@ __all__ = ['LoadingThread']
 class LoadingThread(QThread):
     updateStatus = pyqtSignal(str)
     updatePercent = pyqtSignal(int)
+    updateMaxPercent = pyqtSignal(int)
     loadingDone = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -21,6 +22,7 @@ class LoadingThread(QThread):
             self.interval = 1
         else:
             self.interval = int(iter_num / 100)
+        self.updateMaxPercent.emit(100)
 
     def check_percent(self, iter_):  # TODO is this optimal?
         if self.interval == 1:

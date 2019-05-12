@@ -1,9 +1,9 @@
-from PyQt5.QtCore import Qt, QPoint
-from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtGui import QVector3D, QOpenGLShaderProgram, QOpenGLShader, \
-    QMatrix4x4, QVector4D, QCursor, QColor
-from OpenGL import GL
 import numpy as np
+from OpenGL import GL
+from PyQt5.QtCore import QPoint, Qt
+from PyQt5.QtGui import (QColor, QCursor, QMatrix4x4, QOpenGLShader,
+                         QOpenGLShaderProgram, QVector3D, QVector4D)
+from PyQt5.QtWidgets import QMainWindow
 
 from ui_compiled.mainwindow import Ui_MainWindow
 
@@ -14,7 +14,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, processor, df, parent=None):
         super().__init__(parent)
         self.processor = processor
+        # Data
         self.df = df
+        self.min_val = self.max_val = 0
+        self.min_lon = self.max_lon = self.min_lat = self.max_lat = 0
+        self.val_lon_proportion = 1  # TODO?
+
+        # UI
         self.setupUi(self)
         self.setupControls()
         self.keyPressEvent = self.keyPressed
@@ -22,30 +28,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tabifyDockWidget(self.lightDockWidget, self.controlsDockWidget)
         self.lightDockWidget.raise_()
 
+        # Control & Display
         self.mouse_grabbed = False
 
         self.camera_pos = QVector3D(0, 0, 4)
         self.camera_rot = QVector3D(0, 0, -1)
         self.scale_vec = QVector3D(1, 1, 1)
 
-        self.light_pos = QVector3D(
-            self.xLightSpinBox.value(),
-            self.yLightSpinBox.value(),
-            self.zLightSpinBox.value()
-        )
+        self.light_pos = QVector3D(self.xLightSpinBox.value(),
+                                   self.yLightSpinBox.value(),
+                                   self.zLightSpinBox.value())
         self.ambient = self.ambientSlider.value() / 100
         self.diffuse = self.diffuseSlider.value() / 100
         self.alpha = self.alphaSlider.value() / 100
         self.draw_invisible = self.invisibleCheckBox.isChecked()
 
+        # Drawing
         self.normals = []
         self.colors = []
         self.coords_array = []
-        self.min_val = self.max_val = 0
-        self.min_lon = self.max_lon = self.min_lat = self.max_lat = 0
-        self.val_lon_proportion = 1  # TODO?
-
         self.update_light = False
+
+        self.grid_freq = 10
 
         self.prepareScene()
 
@@ -53,46 +57,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.openGLWidget.initializeGL = self.initializeGL
         self.openGLWidget.paintGL = self.paintGL
 
-    # ==================== POLYGONS PREPARATION ====================
-
+    # ==================== PREPARATION ====================
     def prepareScene(self):
         polygons, normals, colors = self.getLightSourceCoords()
-        light = self.preparePolygons(polygons, normals, colors)
+        self.light = self.preparePolygons(polygons, normals, colors)
         polygons, normals, colors = self.getMapPolygons()
-        map_ = self.preparePolygons(polygons, normals, colors)
-        self.light, self.map_ = light, map_
+        self.map_ = self.preparePolygons(polygons, normals, colors)
+        lines, line_colors = self.getGrid()
+        self.grid = self.prepareLines(lines, line_colors)
 
+    # POLYGONS
     def getLightSourceCoords(self):
-        polygons = np.array([
-            ((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)),
-            ((0, 0, 1), (0, 1, 1), (1, 1, 1), (1, 0, 1)),
-            ((0, 0, 0), (0, 0, 1), (1, 0, 1), (1, 0, 0)),
-            ((0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)),
-            ((0, 0, 0), (0, 0, 1), (0, 1, 1), (0, 1, 0)),
-            ((1, 0, 0), (1, 0, 1), (1, 1, 1), (1, 1, 0))
-        ])
-        normals = [
-            (0, 0, -1),
-            (0, 0, 1),
-            (0, -1, 0),
-            (0, 1, 0),
-            (-1, 0, 0),
-            (1, 0, 0)
-        ]
+        polygons = np.array([((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)),
+                             ((0, 0, 1), (0, 1, 1), (1, 1, 1), (1, 0, 1)),
+                             ((0, 0, 0), (0, 0, 1), (1, 0, 1), (1, 0, 0)),
+                             ((0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)),
+                             ((0, 0, 0), (0, 0, 1), (0, 1, 1), (0, 1, 0)),
+                             ((1, 0, 0), (1, 0, 1), (1, 1, 1), (1, 1, 0))])
+        normals = [(0, 0, -1), (0, 0, 1), (0, -1, 0), (0, 1, 0), (-1, 0, 0),
+                   (1, 0, 0)]
 
         normals_vec = []
-        [[normals_vec.append(QVector3D(*normals[i]))
-          for _ in range(len(polygons[i]))]
-         for i in range(len(polygons))]
+        [[
+            normals_vec.append(QVector3D(*normals[i]))
+            for _ in range(len(polygons[i]))
+        ] for i in range(len(polygons))]
 
-        center = np.array((self.light_pos.x(),
-                           self.light_pos.y(),
-                           self.light_pos.z()))
+        center = np.array(
+            (self.light_pos.x(), self.light_pos.y(), self.light_pos.z()))
         polygons = [[p * 0.1 + center for p in side] for side in polygons]
 
         colors = []
-        [colors.append(QVector4D(1, 153 / 255, 0, 0.5) * self.diffuse)
-         for _ in range(len(normals_vec))]
+        [
+            colors.append(QVector4D(1, 153 / 255, 0, 0.5) * self.diffuse)
+            for _ in range(len(normals_vec))
+        ]
         return polygons, normals_vec, colors
 
     def getMapPolygons(self):
@@ -104,10 +103,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.max_val = max(self.df['value'])
         polygons, normals, colors = [], [], []
         for polygon, normal in self.processor.polygon_generator(self.df):
-            polygons.append(self.normalizePolygon(polygon))
+            polygons.append(self.swapPoints(self.normalizePoints(polygon)))
             [normals.append(QVector3D(*normal)) for _ in polygon]
-            [colors.append(self.getColorByValue(val))
-             for x, y, val in polygon]
+            [colors.append(self.getColorByValue(val)) for x, y, val in polygon]
         return polygons, normals, colors
 
     def getColorByValue(self, value):
@@ -117,14 +115,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         color_vec = QVector4D(color.redF(), color.greenF(), color.blueF(), 0.5)
         return color_vec
 
-    def normalizePolygon(self, polygon):
+    def normalizePoints(self, polygon):
         normalized = []
         for lon, lat, value in polygon:
             lon_ = self.normalizeLon(lon)
             lat_ = self.normalizeLat(lat)
             value_ = self.normalizeValue(value) * self.val_lon_proportion
-            normalized.append((lon_, value_, lat_))
+            normalized.append((lon_, lat_, value_))
         return normalized
+
+    def swapPoints(self, polygon):
+        return [(lon, value, lat) for lon, lat, value in polygon]
 
     def normalizeLat(self, lat):
         return (lat - self.min_lat) / (self.max_lat - self.min_lat)
@@ -149,6 +150,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.coords_array[i] = coords_array[i]
                 self.normals[i] = normals[i]
                 self.colors[i] = colors[i]
+        end = len(self.coords_array)
+        return start, end
+
+    # LINES
+    def getGrid(self):
+        assert self.min_lat != self.max_lat and self.min_val != self.max_val
+        value = self.min_val - (self.max_val - self.min_val) * 0.1
+
+        lines = []
+        for lat in np.linspace(self.min_lat, self.max_lat, self.grid_freq):
+            line = ((self.min_lon, lat, value), (self.max_lon, lat, value))
+            lines.append(line)
+        for lon in np.linspace(self.min_lon, self.max_lon, self.grid_freq):
+            line = ((lon, self.min_lat, value), (lon, self.max_lat, value))
+            lines.append(line)
+
+        # lines.append(((self.min_lon, self.min_lat, self.min_val),
+        #              (self.min_lon, self.min_lat, self.max_val)))
+
+        lines = [self.swapPoints(self.normalizePoints(line)) for line in lines]
+        line_colors = [(QVector4D(1, 1, 1, 1), QVector4D(1, 1, 1, 1))
+                       for _ in lines]
+        return lines, line_colors
+
+    def prepareLines(self, lines, line_colors):
+        assert len(lines) == len(line_colors)
+        start = len(self.coords_array)
+        [self.prepareLine(line, colors)
+         for line, colors in zip(lines, line_colors)]
+        end = len(self.coords_array)
+        return start, end
+
+    def prepareLine(self, line, colors):
+        assert len(line) == len(colors)
+        start = len(self.coords_array)
+        [self.coords_array.append(p) for p in line]
+        [self.colors.append(c) for c in colors]
+        [self.normals.append(QVector3D(0, 1, 0)) for _ in line]
         end = len(self.coords_array)
         return start, end
 
@@ -182,6 +221,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             res = func(self, *args, **kwargs)
             self.openGLWidget.update()
             return res
+
         return wrapper
 
     def updateLightData(self):
@@ -201,7 +241,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def loadScene(self):
         width, height = self.openGLWidget.width(), self.openGLWidget.height()
-        GL.glViewport(0, 0, width, height)
+        view = max(width, height)
+        GL.glViewport(0, 0, view, view)
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
@@ -218,11 +259,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             proj.ortho(-0.3, 1, -0.3, 1, 2, 20)
         modelview = QMatrix4x4()
-        modelview.lookAt(
-            self.camera_pos,
-            self.camera_pos + self.camera_rot,
-            QVector3D(0, 1, 0)
-        )
+        modelview.lookAt(self.camera_pos, self.camera_pos + self.camera_rot,
+                         QVector3D(0, 1, 0))
         self.shaders.setUniformValue("ModelViewMatrix", modelview)
         self.shaders.setUniformValue("MVP", proj * modelview)
 
@@ -235,35 +273,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def drawScene(self):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         self.shaders.setUniformValue('phongModel', False)
-        self.drawPrepared(*self.light)
+        self.drawPreparedPolygons(*self.light)
+        self.drawPreparedLines(*self.grid)
         self.shaders.setUniformValue('phongModel', True)
-        self.drawPrepared(*self.map_)
+        self.drawPreparedPolygons(*self.map_)
 
-    def drawPrepared(self, start, end):
+    def drawPreparedPolygons(self, start, end):
         for i in range(start, end, 4):
             GL.glDrawArrays(GL.GL_POLYGON, i, 4)
 
-    def drawCoordSystem(self):
-        coords = (
-            ((0, 0, -100), (0, 0, 100)),
-            ((-100, 0, 0), (100, 0, 0)),
-            ((0, -100, 0), (0, 100, 0))
-        )
-        coords_array = []
-        line_colors = []
-        [line_colors.append(QVector4D(1, 1, 1, 1))
-         for _ in range(len(coords) * 2)]
-        [[coords_array.append(p) for p in line] for line in coords]
-
-        GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
-        self.shaders.setAttributeArray("v_color", line_colors)
-        self.shaders.setUniformValue("phongModel", False)
-        GL.glVertexPointer(3, GL.GL_FLOAT, 0, coords_array)
-        for i in range(len(coords)):
-            start_index = i * 2
-            GL.glDrawArrays(GL.GL_LINES, start_index, 2)
-
-        GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
+    def drawPreparedLines(self, start, end):
+        GL.glDrawArrays(GL.GL_LINES, start, end-start)
 
     # ==================== CONTROLS ====================
     def setupControls(self):
@@ -281,18 +301,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.zScaleSpinBox.valueChanged.connect(lambda z: self.scaleView(z=z))
 
         # Light
-        self.ambientSlider.valueChanged.connect(
-            lambda ambient: self.setLight(ambient=ambient / 100))
-        self.diffuseSlider.valueChanged.connect(
-            lambda diffuse: self.setLight(diffuse=diffuse / 100))
+        self.ambientSlider.valueChanged.connect(lambda ambient: self.setLight(
+            ambient=ambient / 100))
+        self.diffuseSlider.valueChanged.connect(lambda diffuse: self.setLight(
+            diffuse=diffuse / 100))
 
         self.xLightSpinBox.valueChanged.connect(lambda x: self.setLight(x=x))
         self.yLightSpinBox.valueChanged.connect(lambda y: self.setLight(y=y))
         self.zLightSpinBox.valueChanged.connect(lambda z: self.setLight(z=z))
 
         # Misc
-        self.alphaSlider.valueChanged.connect(
-            lambda alpha: self.setDisplay(alpha / 100))
+        self.alphaSlider.valueChanged.connect(lambda alpha: self.setDisplay(
+            alpha / 100))
         self.invisibleCheckBox.stateChanged.connect(
             lambda invisible: self.setDisplay(invisible=invisible))
         self.actionGrabKeyboard.toggled.connect(self.toggleGrabKeyboard)
@@ -300,19 +320,42 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.orhogonalRadioButton.clicked.connect(self.openGLWidget.update)
         self.perspectiveRadioButton.clicked.connect(self.openGLWidget.update)
 
+        self.openGLWidget.mousePressEvent \
+            = lambda event: self.actionGrabMouse.setChecked(True)
+
     def keyPressed(self, event):
         key = event.key()
         camera_dict = {
-            Qt.Key_W: {'z': 1},
-            Qt.Key_S: {'z': -1},
-            Qt.Key_A: {'x': -1},
-            Qt.Key_D: {'x': 1},
-            Qt.Key_Z: {'y': 1},
-            Qt.Key_X: {'y': -1},
-            Qt.Key_Up: {'az': 1},
-            Qt.Key_Down: {'az': -1},
-            Qt.Key_Left: {'pol': 1},
-            Qt.Key_Right: {'pol': -1}
+            Qt.Key_W: {
+                'z': 1
+            },
+            Qt.Key_S: {
+                'z': -1
+            },
+            Qt.Key_A: {
+                'x': -1
+            },
+            Qt.Key_D: {
+                'x': 1
+            },
+            Qt.Key_Z: {
+                'y': 1
+            },
+            Qt.Key_X: {
+                'y': -1
+            },
+            Qt.Key_Up: {
+                'az': 1
+            },
+            Qt.Key_Down: {
+                'az': -1
+            },
+            Qt.Key_Left: {
+                'pol': 1
+            },
+            Qt.Key_Right: {
+                'pol': -1
+            }
         }
         self.moveCamera(**camera_dict.get(key, {}))
         if key == Qt.Key_Escape:
@@ -325,8 +368,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.mouse_grabbed:
             delta = event.globalPos() - self.mouse_center
             QCursor.setPos(self.mouse_center)
-            self.moveCamera(az=delta.y()*az_sensivity,
-                            pol=delta.x()*pol_sensivity)
+            self.moveCamera(az=delta.y() * az_sensivity,
+                            pol=delta.x() * pol_sensivity)
         else:
             super().mouseMoveEvent(event)
 
@@ -363,8 +406,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.scale_vec.setZ(z)
 
     @updateGL
-    def setLight(self, x=None, y=None, z=None, ambient=None,
-                 diffuse=None):
+    def setLight(self, x=None, y=None, z=None, ambient=None, diffuse=None):
         if x:
             self.light_pos.setX(x)
         if y:

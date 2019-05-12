@@ -68,6 +68,7 @@ class LoadingWrapper(QObject):
         thread.updatePercent.connect(self.dialog.set_done)
         thread.loadingDone.connect(self.dialog.ready)
         thread.loadingDone.connect(lambda: self.loadingDone.emit())
+        thread.updateMaxPercent.connect(self.dialog.progressBar.setMaximum)
 
     def start(self):
         self.dialog.show()
