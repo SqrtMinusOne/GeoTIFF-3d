@@ -51,6 +51,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.grid_freq = 10
 
+        self.grid_color = QVector4D(1, 1, 1, 1)
+        self.contour_color = QVector4D(1, 1, 1, 1)
+
         self.prepareScene()
 
         self.shaders = QOpenGLShaderProgram()
@@ -65,6 +68,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.map_ = self.preparePolygons(polygons, normals, colors)
         lines, line_colors = self.getGrid()
         self.grid = self.prepareLines(lines, line_colors)
+        self.contour = self.getContour()
 
     # POLYGONS
     def getLightSourceCoords(self):
@@ -170,9 +174,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #              (self.min_lon, self.min_lat, self.max_val)))
 
         lines = [self.swapPoints(self.normalizePoints(line)) for line in lines]
-        line_colors = [(QVector4D(1, 1, 1, 1), QVector4D(1, 1, 1, 1))
+        line_colors = [(self.grid_color, self.grid_color)
                        for _ in lines]
         return lines, line_colors
+
+    def getContour(self):
+        lev_lines = self.processor.get_contour(levels=20)
+        contour = []
+        for level, line in lev_lines:
+            line = [(self.normalizeLon(lon),
+                     self.normalizeValue(level + 10),
+                     self.normalizeLat(lat)) for lon, lat in line]
+            colors = [self.contour_color] * len(line)
+            contour.append(self.prepareLine(line, colors))
+        return contour
 
     def prepareLines(self, lines, line_colors):
         assert len(lines) == len(line_colors)
@@ -248,7 +263,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
-        if self.draw_invisible:
+        if self.draw_invisible or True:  # TODO
             GL.glEnable(GL.GL_DEPTH_TEST)
             GL.glDepthFunc(GL.GL_LEQUAL)
         else:
@@ -279,6 +294,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.drawPreparedLines(*self.grid)
         self.shaders.setUniformValue('phongModel', True)
         self.drawPreparedPolygons(*self.map_)
+        self.shaders.setUniformValue('phongModel', False)
+        self.drawPreparedLineStrips(self.contour)
 
     def drawPreparedPolygons(self, start, end):
         for i in range(start, end, 4):
@@ -286,6 +303,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def drawPreparedLines(self, start, end):
         GL.glDrawArrays(GL.GL_LINES, start, end - start)
+
+    def drawPreparedLineStrips(self, arr):
+        for start, end in arr:
+            GL.glDrawArrays(GL.GL_LINE_STRIP, start, end - start)
 
     # ==================== CONTROLS ====================
     def setupControls(self):

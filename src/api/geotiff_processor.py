@@ -63,11 +63,14 @@ class GeoTIFFProcessor:
             self.df_ready.emit(self.df)
             self.loadingDone.emit()
 
-    def __init__(self):
-        self.data = None
+    def __init__(self, data=None):
+        self.data = data
+        if data is None:
+            self.border = 0., 0., 0., 0.
+            self.xsize, self.ysize = 0, 0
+        else:
+            self.borders = self.get_borders(data)
         self.fig, self.ax = None, None
-        self.border = 0., 0., 0., 0.
-        self.xsize, self.ysize = 0, 0
         self.canvas = None
 
     # ==================== STATE ====================
@@ -80,12 +83,12 @@ class GeoTIFFProcessor:
         return self.fig is not None
 
     # ==================== DATA PROPERTIES ====================
-    def get_borders(self, data=None):
+    def get_borders(self, data_=None):
         """Вычислить границы для GeoRaster'a
 
         :param data: GeoRaster
         """
-        data = self.data if data is None else data
+        data = self.data if data_ is None else data_
         xmin, xsize, xrot, ymax, yrot, ysize = data.geot
         self.xsize, self.ysize = xsize, ysize
         xlen = data.count(axis=0)[0] * xsize
@@ -123,6 +126,30 @@ class GeoTIFFProcessor:
     def df_size_estimate(self, *args, **kwargs):
         return self.points_estimate(*args, **kwargs) * 58 + 80
 
+    def get_value(self, x, y, data=None):
+        data = data if data is not None else self.data
+        xlen, ylen = self.get_dimensions(data)
+        x_1, x_2 = int(np.floor(x)), int(np.ceil(x))
+        y_1, y_2 = int(np.floor(y)), int(np.ceil(y))
+        x_2 = x_2 if x_2 < xlen else x_1
+        y_2 = y_2 if y_2 < ylen else y_1
+        v_11 = data.raster[x_1, y_1]
+        v_12 = data.raster[x_1, y_2]
+        v_21 = data.raster[x_2, y_1]
+        v_22 = data.raster[x_2, y_2]
+        if x_2 != x_1:
+            v_r1 = (x_2 - x) / (x_2 - x_1) * v_11 + (x - x_1) / (x_2 -
+                                                                 x_1) * v_21
+            v_r2 = (x_2 - x) / (x_2 - x_1) * v_12 + (x - x_1) / (x_2 -
+                                                                 x_1) * v_22
+        else:
+            v_r1, v_r2 = v_11, v_12
+        if y_2 != y_1:
+            v = (y_2 - y) / (y_2 - y_1) * v_r1 + (y - y_1) / (y_2 - y_1) * v_r2
+        else:
+            v = v_r1
+        return v
+
     # ==================== DATA PROCESSING & PANDAS ====================
     def _modify_data(self, lat=None, lon=None, r=None, coef=1):
         data = self.data
@@ -133,6 +160,40 @@ class GeoTIFFProcessor:
             new_shape = (int(xlen * coef), int(ylen * coef))
             data = data.resize(new_shape, cval=True)
         return data
+
+    def get_contour(self, data=None, *args, **kwargs):
+        data = self.data if data is None else data
+        xlen, ylen = self.get_dimensions(data)
+        lonmin, lonmax, latmin, latmax = self.get_borders(data)
+        x_start = lonmin if data.x_cell_size > 0 else lonmax
+        y_start = latmin if data.y_cell_size > 0 else latmax
+        X = [i for i in range(0, xlen)]
+        Y = [i for i in range(0, ylen)]
+        X, Y = np.meshgrid(X, Y)
+        Z = data.raster[Y, X]
+        actual_X = [x_start + i * data.x_cell_size for i in range(xlen)]
+        actual_Y = [y_start + i * data.y_cell_size for i in range(ylen)]
+        actual_X, actual_Y = np.meshgrid(actual_X, actual_Y)
+        # c1 = plt.contour(X, Y, Z, *args, **kwargs)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        c2 = ax.contour(actual_X, actual_Y, Z, *args, **kwargs)
+        result = []
+        # for coll1, coll2 in zip(c1.collections, c2.collections):
+        #     for seg1, seg2 in zip(coll1.get_segments(),
+        #                           coll2.get_segments()):
+        #         val = max([self.get_value(lat, lon, data)
+        #                    for lon, lat in seg1])
+        #        result.append((val, seg2))
+        import pprint
+        for level, coll in zip(c2.levels, c2.collections):
+            print(f'====={level}: {len(coll.get_segments())}======')
+            for seg in coll.get_segments():
+                if len(seg) < 10:
+                    continue
+                result.append((level, seg))
+                print('SEGMENT')
+                pprint.pprint(seg)
+        return result
 
     def extract_to_pandas(self, *args, **kwargs):
         data = self._modify_data(*args, **kwargs)

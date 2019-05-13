@@ -136,7 +136,9 @@ class OpenDialog(QDialog, Ui_OpenDialog):
 
     def on_normals_ready(self, df):
         self.thread = None
-        self.window = MainWindow(self.processor, df, self)
+        pass_proc = GeoTIFFProcessor(
+            self.processor._modify_data(**self.proc_params()))
+        self.window = MainWindow(pass_proc, df, self)
         self.window.show()
         self.hide()
 

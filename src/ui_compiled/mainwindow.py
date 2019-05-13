@@ -171,6 +171,7 @@ class Ui_MainWindow(object):
         self.alphaSlider.setObjectName("alphaSlider")
         self.verticalLayout_3.addWidget(self.alphaSlider)
         self.invisibleCheckBox = QtWidgets.QCheckBox(self.dockWidgetContents_4)
+        self.invisibleCheckBox.setChecked(True)
         self.invisibleCheckBox.setObjectName("invisibleCheckBox")
         self.verticalLayout_3.addWidget(self.invisibleCheckBox)
         spacerItem = QtWidgets.QSpacerItem(20, 25, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
