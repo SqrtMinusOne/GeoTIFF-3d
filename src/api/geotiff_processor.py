@@ -126,7 +126,7 @@ class GeoTIFFProcessor:
     def df_size_estimate(self, *args, **kwargs):
         return self.points_estimate(*args, **kwargs) * 58 + 80
 
-    def get_value(self, x, y, data=None):
+    def get_value(self, x, y, data=None):  # TODO Is this required?
         data = data if data is not None else self.data
         xlen, ylen = self.get_dimensions(data)
         x_1, x_2 = int(np.floor(x)), int(np.ceil(x))
@@ -162,7 +162,14 @@ class GeoTIFFProcessor:
         return data
 
     def get_contour(self, data=None, *args, **kwargs):
+        def get_lon(x):
+            return x_start + x * data.x_cell_size
+
+        def get_lat(y):
+            return y_start + y * data.y_cell_size
+
         data = self.data if data is None else data
+
         xlen, ylen = self.get_dimensions(data)
         lonmin, lonmax, latmin, latmax = self.get_borders(data)
         x_start = lonmin if data.x_cell_size > 0 else lonmax
@@ -171,28 +178,13 @@ class GeoTIFFProcessor:
         Y = [i for i in range(0, ylen)]
         X, Y = np.meshgrid(X, Y)
         Z = data.raster[Y, X]
-        actual_X = [x_start + i * data.x_cell_size for i in range(xlen)]
-        actual_Y = [y_start + i * data.y_cell_size for i in range(ylen)]
-        actual_X, actual_Y = np.meshgrid(actual_X, actual_Y)
-        # c1 = plt.contour(X, Y, Z, *args, **kwargs)
-        fig, ax = plt.subplots(figsize=(10, 10))
-        c2 = ax.contour(actual_X, actual_Y, Z, *args, **kwargs)
+        contour = plt.contour(X, Y, Z, *args, **kwargs)
+
         result = []
-        # for coll1, coll2 in zip(c1.collections, c2.collections):
-        #     for seg1, seg2 in zip(coll1.get_segments(),
-        #                           coll2.get_segments()):
-        #         val = max([self.get_value(lat, lon, data)
-        #                    for lon, lat in seg1])
-        #        result.append((val, seg2))
-        import pprint
-        for level, coll in zip(c2.levels, c2.collections):
-            print(f'====={level}: {len(coll.get_segments())}======')
+        for level, coll in zip(contour.levels, contour.collections):
             for seg in coll.get_segments():
-                if len(seg) < 10:
-                    continue
-                result.append((level, seg))
-                print('SEGMENT')
-                pprint.pprint(seg)
+                new_seg = [(get_lon(x), get_lat(y)) for x, y in seg]
+                result.append((level, new_seg))
         return result
 
     def extract_to_pandas(self, *args, **kwargs):

@@ -41,7 +41,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ambient = self.ambientSlider.value() / 100
         self.diffuse = self.diffuseSlider.value() / 100
         self.alpha = self.alphaSlider.value() / 100
-        self.draw_invisible = self.invisibleCheckBox.isChecked()
 
         # Drawing
         self.normals = []
@@ -62,6 +61,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # ==================== PREPARATION ====================
     def prepareScene(self):
+        self.coords_array = []
+        self.colors = []
+        self.normals = []
         polygons, normals, colors = self.getLightSourceCoords()
         self.light = self.preparePolygons(polygons, normals, colors)
         polygons, normals, colors = self.getMapPolygons()
@@ -263,11 +265,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
-        if self.draw_invisible or True:  # TODO
-            GL.glEnable(GL.GL_DEPTH_TEST)
-            GL.glDepthFunc(GL.GL_LEQUAL)
-        else:
-            GL.glDisable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glDepthFunc(GL.GL_LEQUAL)
 
     def updateMatrices(self):
         proj = QMatrix4x4()
@@ -336,8 +335,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Misc
         self.alphaSlider.valueChanged.connect(lambda alpha: self.setDisplay(
             alpha / 100))
-        self.invisibleCheckBox.stateChanged.connect(
-            lambda invisible: self.setDisplay(invisible=invisible))
         self.actionGrabKeyboard.toggled.connect(self.toggleGrabKeyboard)
         self.actionGrabMouse.toggled.connect(self.toggleGrabMouse)
         self.orhogonalRadioButton.clicked.connect(self.openGLWidget.update)

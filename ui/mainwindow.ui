@@ -47,8 +47,8 @@
    </property>
    <property name="maximumSize">
     <size>
-     <width>259</width>
-     <height>213</height>
+     <width>524287</width>
+     <height>524287</height>
     </size>
    </property>
    <property name="features">
@@ -183,8 +183,8 @@
    </property>
    <property name="maximumSize">
     <size>
-     <width>240</width>
-     <height>95</height>
+     <width>524287</width>
+     <height>524287</height>
     </size>
    </property>
    <property name="features">
@@ -350,16 +350,6 @@
        </property>
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="invisibleCheckBox">
-       <property name="text">
-        <string>Hide insivible edges</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
        </property>
       </widget>
      </item>
