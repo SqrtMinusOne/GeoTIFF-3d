@@ -78,7 +78,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tabifyDockWidget(self.projDockWidget,
                               self.additionalDockWidget)
         self.tabifyDockWidget(self.elevationDockWidget,
-                              self.controlsDockWidget)
+                              self.cameraDockWidget)
         self.lightDockWidget.raise_()
         self.additionalDockWidget.raise_()
         self.elevationDockWidget.raise_()
@@ -88,6 +88,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.denormalizeValue(self.camera_pos.y()),
             width=240, height=100)
         self.elevationWidgetLayout.addWidget(self.elevationWidget)
+        self.mapDockWidgetControls()
+
+    def mapDockWidgetControls(self):
+        self.dock_widgets = [
+            self.lightDockWidget, self.cameraDockWidget,
+            self.additionalDockWidget, self.minimapDockWidget,
+            self.displayDockWidget, self.projDockWidget,
+            self.elevationDockWidget]
+        self.dock_actions = [
+            self.actionShowLightSourceDW, self.actionShowCameraDW,
+            self.actionShowAdditionalDW, self.actionShowMinimapDW,
+            self.actionShowDisplayDW, self.actionShowProjectionDW,
+            self.actionShowElevationDW]
+        for dock_widget, action in zip(self.dock_widgets, self.dock_actions):
+            def wrapper(action):
+                def dock_widget_close_event(event):
+                    action.setChecked(False)
+                    event.accept()
+                return dock_widget_close_event
+
+            dock_widget.closeEvent = wrapper(action)
+            action.triggered.connect(dock_widget.setVisible)
 
     # ==================== PREPARATION ====================
     def prepareScene(self):
