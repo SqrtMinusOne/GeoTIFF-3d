@@ -5,6 +5,7 @@ from PyQt5.QtGui import (QColor, QCursor, QMatrix4x4, QOpenGLShader,
                          QOpenGLShaderProgram, QVector3D, QVector4D)
 from PyQt5.QtWidgets import QMainWindow
 
+from ui.widgets import ElevationGraphWidget
 from ui_compiled.mainwindow import Ui_MainWindow
 
 __all__ = ['MainWindow']
@@ -25,10 +26,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupControls()
         self.keyPressEvent = self.keyPressed
         self.mouseMoveEvent = self.mouseMoved
-        self.tabifyDockWidget(self.lightDockWidget, self.controlsDockWidget)
-        self.tabifyDockWidget(self.displayDockWidget,
-                              self.additionalDockWidget)
-        self.lightDockWidget.raise_()
 
         # Control & Display
         self.mouse_grabbed = False
@@ -62,10 +59,35 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.light_line_color = QVector4D(1, 0.6, 0, 1)
 
         self.prepareScene()
+        self.updateUi()
 
         self.shaders = QOpenGLShaderProgram()
         self.openGLWidget.initializeGL = self.initializeGL
         self.openGLWidget.paintGL = self.paintGL
+
+    def updateUi(self):
+        self.splitDockWidget(self.displayDockWidget, self.elevationDockWidget,
+                             Qt.Vertical)
+        self.splitDockWidget(self.elevationDockWidget, self.displayDockWidget,
+                             Qt.Vertical)
+
+        self.tabifyDockWidget(self.elevationDockWidget,
+                              self.minimapDockWidget)
+        self.tabifyDockWidget(self.displayDockWidget,
+                              self.lightDockWidget)
+        self.tabifyDockWidget(self.projDockWidget,
+                              self.additionalDockWidget)
+        self.tabifyDockWidget(self.elevationDockWidget,
+                              self.controlsDockWidget)
+        self.lightDockWidget.raise_()
+        self.additionalDockWidget.raise_()
+        self.elevationDockWidget.raise_()
+
+        self.elevationWidget = ElevationGraphWidget(
+            self.min_val, self.max_val,
+            self.denormalizeValue(self.camera_pos.y()),
+            width=240, height=100)
+        self.elevationWidgetLayout.addWidget(self.elevationWidget)
 
     # ==================== PREPARATION ====================
     def prepareScene(self):
@@ -156,6 +178,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def normalizeValue(self, value):
         return (value - self.min_val) / (self.max_val - self.min_val)
+
+    def denormalizeValue(self, value):
+        return value * (self.max_val - self.min_val) + self.min_val
 
     def preparePolygons(self, polygons, normals, colors, start_index=None):
         coords_array = []
@@ -278,6 +303,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.openGLWidget.update()
             return res
 
+        return wrapper
+
+    def updateCameraInfo(func):
+        def wrapper(self, *args, **kwargs):
+            res = func(self, *args, **kwargs)
+            self.elevationWidget.updatePos(
+                self.denormalizeValue(self.camera_pos.y()))
+            return res
         return wrapper
 
     def updateLightData(self):
@@ -450,6 +483,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             super().mouseMoveEvent(event)
 
     @updateGL
+    @updateCameraInfo
     def moveCamera(self, az=0, pol=0, x=0, y=0, z=0):
         move_coef = 0.1
         rot_coef = 2
