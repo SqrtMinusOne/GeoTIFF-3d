@@ -54,10 +54,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.show_grid = self.gridCheckBox.isChecked()
         self.show_contour = self.contourCheckBox.isChecked()
         self.contour_levels = self.contourLevelSpinBox.value()
+        self.show_light_lines = True
         self.grid_freq = 10
 
         self.grid_color = QVector4D(1, 1, 1, 1)
         self.contour_color = QVector4D(1, 1, 1, 1)
+        self.light_line_color = QVector4D(1, 0.6, 0, 1)
 
         self.prepareScene()
 
@@ -72,6 +74,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.normals = []
         polygons, normals, colors = self.getLightSourceCoords()
         self.light_data = self.preparePolygons(polygons, normals, colors)
+        if self.show_light_lines:
+            lines, line_colors = self.getLightLines()
+            self.light_lines_data = self.prepareLines(lines, line_colors)
+
         polygons, normals, colors = self.getMapPolygons()
         self.map_data = self.preparePolygons(polygons, normals, colors)
         if self.show_grid:
@@ -99,11 +105,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         center = np.array(
             (self.light_pos.x(), self.light_pos.y(), self.light_pos.z()))
-        polygons = [[p * 0.1 + center for p in side] for side in polygons]
-
+        delta = np.array((0.5, 0.5, 0.5))
+        polygons = [[(p - delta) * 0.05 + center for p in side]
+                    for side in polygons]
         colors = []
         [
-            colors.append(QVector4D(1, 153 / 255, 0, 0.5) * self.diffuse)
+            colors.append(QVector4D(1, 153 / 255, 0, 1) * self.diffuse)
             for _ in range(len(normals_vec))
         ]
         return polygons, normals_vec, colors
@@ -160,10 +167,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.normals += normals
             self.colors += colors
         else:
-            for i in range(start_index, start_index + len(coords_array)):
-                self.coords_array[i] = coords_array[i]
-                self.normals[i] = normals[i]
-                self.colors[i] = colors[i]
+            for i, j in enumerate(
+                    range(start_index, start_index + len(coords_array))):
+                self.coords_array[j] = coords_array[i]
+                self.normals[j] = normals[i]
+                self.colors[j] = colors[i]
         end = len(self.coords_array)
         return start, end
 
@@ -184,38 +192,60 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #              (self.min_lon, self.min_lat, self.max_val)))
 
         lines = [self.swapPoints(self.normalizePoints(line)) for line in lines]
-        line_colors = [(self.grid_color, self.grid_color)
-                       for _ in lines]
+        line_colors = [(self.grid_color, self.grid_color) for _ in lines]
         return lines, line_colors
 
     def getContour(self):
         lev_lines = self.processor.get_contour(levels=self.contour_levels)
         contour = []
         for level, line in lev_lines:
-            line = [(self.normalizeLon(lon),
-                     self.normalizeValue(level + 10),
+            line = [(self.normalizeLon(lon), self.normalizeValue(level + 10),
                      self.normalizeLat(lat)) for lon, lat in line]
             colors = [self.contour_color] * len(line)
             contour.append(self.prepareLine(line, colors))
         return contour
 
-    def prepareLines(self, lines, line_colors):
-        assert len(lines) == len(line_colors)
-        start = len(self.coords_array)
-        [
-            self.prepareLine(line, colors)
-            for line, colors in zip(lines, line_colors)
-        ]
-        end = len(self.coords_array)
-        return start, end
+    def getLightLines(self):
+        lines = (((self.light_pos.x(), 0, -100), (self.light_pos.x(), 0, 100)),
+                 ((-100, 0, self.light_pos.z()), (100, 0, self.light_pos.z())),
+                 ((self.light_pos.x(), 0, self.light_pos.z()),
+                  (self.light_pos.x(), self.light_pos.y(),
+                   self.light_pos.z())))
+        line_colors = [(self.light_line_color, self.light_line_color)
+                       for _ in lines]
+        return lines, line_colors
 
-    def prepareLine(self, line, colors):
+    def prepareLines(self, lines, line_colors, start_index=None):
+        assert len(lines) == len(line_colors)
+        if start_index is None:
+            data = [None] * len(lines)
+        else:
+            data = []
+            sum_len = 0
+            for line in lines:
+                data.append(start_index + sum_len)
+                sum_len += len(line)
+
+        result = [
+            self.prepareLine(line, colors, datum)
+            for line, colors, datum in zip(lines, line_colors, data)
+        ]
+        return result[0][0], result[-1][1]
+
+    def prepareLine(self, line, colors, start_index=None):
         assert len(line) == len(colors)
-        start = len(self.coords_array)
-        [self.coords_array.append(p) for p in line]
-        [self.colors.append(c) for c in colors]
-        [self.normals.append(QVector3D(0, 1, 0)) for _ in line]
-        end = len(self.coords_array)
+        if start_index is None:
+            start = len(self.coords_array)
+            self.coords_array += line
+            self.colors += colors
+            self.normals += [QVector3D(0, 1, 0)] * len(line)
+            end = len(self.coords_array)
+        else:
+            start = start_index
+            for i, j in enumerate(range(start_index, start_index + len(line))):
+                self.coords_array[j] = line[i]
+                self.colors[j] = colors[i]
+            end = start_index + len(line)
         return start, end
 
     # ==================== SCENE PREPARATION ====================
@@ -253,6 +283,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateLightData(self):
         polygons, normals, colors = self.getLightSourceCoords()
         self.preparePolygons(polygons, normals, colors, self.light_data[0])
+        lines, colors = self.getLightLines()
+        self.prepareLines(lines, colors, self.light_lines_data[0])
         GL.glVertexPointer(3, GL.GL_FLOAT, 0, self.coords_array)
         self.update_light = False
 
@@ -285,9 +317,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateMatrices(self):
         proj = QMatrix4x4()
         if self.perspectiveRadioButton.isChecked():
-            proj.frustum(-0.3, 1, -0.3, 1, 2, 20)
+            proj.frustum(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
         else:
-            proj.ortho(-0.3, 1, -0.3, 1, 2, 20)
+            proj.ortho(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
         modelview = QMatrix4x4()
         modelview.lookAt(self.camera_pos, self.camera_pos + self.camera_rot,
                          QVector3D(0, 1, 0))
@@ -304,6 +336,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         self.shaders.setUniformValue('phongModel', False)
         self.drawPreparedPolygons(*self.light_data)
+        if self.show_light_lines:
+            self.drawPreparedLines(*self.light_lines_data)
         if self.show_grid:
             self.drawPreparedLines(*self.grid_data)
         self.shaders.setUniformValue('phongModel', True)
@@ -351,8 +385,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Display
         self.gridCheckBox.toggled.connect(lambda g: self.setGrid(show=g))
         self.contourCheckBox.toggled.connect(lambda c: self.setContour(show=c))
-        self.contourLevelSpinBox.valueChanged.connect(
-            lambda l: self.setContour(levels=l))
+        self.contourLevelSpinBox.valueChanged.connect(lambda l: self.
+                                                      setContour(levels=l))
 
         # Misc
         self.alphaSlider.valueChanged.connect(lambda alpha: self.setDisplay(
