@@ -26,6 +26,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.keyPressEvent = self.keyPressed
         self.mouseMoveEvent = self.mouseMoved
         self.tabifyDockWidget(self.lightDockWidget, self.controlsDockWidget)
+        self.tabifyDockWidget(self.displayDockWidget,
+                              self.additionalDockWidget)
         self.lightDockWidget.raise_()
 
         # Control & Display
@@ -47,7 +49,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.colors = []
         self.coords_array = []
         self.update_light = False
+        self.update_buffer = False
 
+        self.show_grid = self.gridCheckBox.isChecked()
+        self.show_contour = self.contourCheckBox.isChecked()
+        self.contour_levels = self.contourLevelSpinBox.value()
         self.grid_freq = 10
 
         self.grid_color = QVector4D(1, 1, 1, 1)
@@ -65,12 +71,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.colors = []
         self.normals = []
         polygons, normals, colors = self.getLightSourceCoords()
-        self.light = self.preparePolygons(polygons, normals, colors)
+        self.light_data = self.preparePolygons(polygons, normals, colors)
         polygons, normals, colors = self.getMapPolygons()
-        self.map_ = self.preparePolygons(polygons, normals, colors)
-        lines, line_colors = self.getGrid()
-        self.grid = self.prepareLines(lines, line_colors)
-        self.contour = self.getContour()
+        self.map_data = self.preparePolygons(polygons, normals, colors)
+        if self.show_grid:
+            lines, line_colors = self.getGrid()
+            self.grid_data = self.prepareLines(lines, line_colors)
+        if self.show_contour:
+            self.contour_data = self.getContour()
 
     # POLYGONS
     def getLightSourceCoords(self):
@@ -181,7 +189,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return lines, line_colors
 
     def getContour(self):
-        lev_lines = self.processor.get_contour(levels=20)
+        lev_lines = self.processor.get_contour(levels=self.contour_levels)
         contour = []
         for level, line in lev_lines:
             line = [(self.normalizeLon(lon),
@@ -213,6 +221,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # ==================== SCENE PREPARATION ====================
     def initializeGL(self):
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
+        GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
         self.setUpShaders()
         self.initVertexArrays()
 
@@ -224,15 +233,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shaders.link()
         self.shaders.bind()
 
+    def initVertexArrays(self):
+        assert len(self.coords_array) == len(self.colors) == len(self.normals)
+        GL.glVertexPointer(3, GL.GL_FLOAT, 0, self.coords_array)
         self.shaders.setAttributeArray("v_color", self.colors)
         self.shaders.enableAttributeArray("v_color")
         self.shaders.setAttributeArray("v_normal", self.normals)
         self.shaders.enableAttributeArray("v_normal")
-
-    def initVertexArrays(self):
-        GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
-        GL.glVertexPointer(3, GL.GL_FLOAT, 0, self.coords_array)
-        assert len(self.coords_array) == len(self.colors) == len(self.normals)
 
     # ==================== UPDATING STUFF ====================
     def updateGL(func):
@@ -245,15 +252,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def updateLightData(self):
         polygons, normals, colors = self.getLightSourceCoords()
-        self.preparePolygons(polygons, normals, colors, self.light[0])
+        self.preparePolygons(polygons, normals, colors, self.light_data[0])
         GL.glVertexPointer(3, GL.GL_FLOAT, 0, self.coords_array)
         self.update_light = False
+
+    def updateBuffer(self):
+        self.prepareScene()
+        self.initVertexArrays()
+        self.update_buffer = False
 
     # ==================== ACTUAL DRAWING ====================
     def paintGL(self):
         self.loadScene()
         if self.update_light:
             self.updateLightData()
+        if self.update_buffer:
+            self.updateBuffer()
         self.updateMatrices()
         self.updateParams()
         self.drawScene()
@@ -289,12 +303,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def drawScene(self):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         self.shaders.setUniformValue('phongModel', False)
-        self.drawPreparedPolygons(*self.light)
-        self.drawPreparedLines(*self.grid)
+        self.drawPreparedPolygons(*self.light_data)
+        if self.show_grid:
+            self.drawPreparedLines(*self.grid_data)
         self.shaders.setUniformValue('phongModel', True)
-        self.drawPreparedPolygons(*self.map_)
-        self.shaders.setUniformValue('phongModel', False)
-        self.drawPreparedLineStrips(self.contour)
+        self.drawPreparedPolygons(*self.map_data)
+        if self.show_contour:
+            self.shaders.setUniformValue('phongModel', False)
+            self.drawPreparedLineStrips(self.contour_data)
 
     def drawPreparedPolygons(self, start, end):
         for i in range(start, end, 4):
@@ -331,6 +347,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.xLightSpinBox.valueChanged.connect(lambda x: self.setLight(x=x))
         self.yLightSpinBox.valueChanged.connect(lambda y: self.setLight(y=y))
         self.zLightSpinBox.valueChanged.connect(lambda z: self.setLight(z=z))
+
+        # Display
+        self.gridCheckBox.toggled.connect(lambda g: self.setGrid(show=g))
+        self.contourCheckBox.toggled.connect(lambda c: self.setContour(show=c))
+        self.contourLevelSpinBox.valueChanged.connect(
+            lambda l: self.setContour(levels=l))
 
         # Misc
         self.alphaSlider.valueChanged.connect(lambda alpha: self.setDisplay(
@@ -445,6 +467,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.invisible = invisible
         if alpha:
             self.alpha = alpha
+
+    @updateGL
+    def setGrid(self, show):
+        self.show_grid = show
+        self.update_buffer = True
+
+    @updateGL
+    def setContour(self, show=None, levels=None):
+        if show is not None:
+            self.show_contour = show
+            self.update_buffer = True
+        if levels is not None:
+            self.contour_levels = levels
+            if self.show_contour:
+                self.update_buffer = True
 
     def toggleGrabKeyboard(self, grab: bool):
         if grab:
