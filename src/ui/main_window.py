@@ -5,7 +5,7 @@ from PyQt5.QtGui import (QColor, QCursor, QMatrix4x4, QOpenGLShader,
                          QOpenGLShaderProgram, QVector3D, QVector4D)
 from PyQt5.QtWidgets import QMainWindow
 
-from ui.widgets import ElevationGraphWidget
+from ui.widgets import ElevationGraphWidget, MinimapGraphWidget
 from ui_compiled.mainwindow import Ui_MainWindow
 
 __all__ = ['MainWindow']
@@ -30,8 +30,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Control & Display
         self.mouse_grabbed = False
 
-        self.camera_pos = QVector3D(0, 0, 4)
-        self.camera_rot = QVector3D(0, 0, -1)
+        self.camera_pos = QVector3D(0.5, 0.5, -2)
+        self.camera_rot = QVector3D(0, 0, 1)
         self.scale_vec = QVector3D(1, 1, 1)
 
         self.light_pos = QVector3D(self.xLightSpinBox.value(),
@@ -87,7 +87,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.min_val, self.max_val,
             self.denormalizeValue(self.camera_pos.y()),
             width=240, height=100)
+        self.minimapWidget = MinimapGraphWidget(
+            self.processor, self.camera_pos, self.camera_rot,
+            width=240, height=100)
         self.elevationWidgetLayout.addWidget(self.elevationWidget)
+        self.minimapLayout.addWidget(self.minimapWidget)
         self.mapDockWidgetControls()
 
     def mapDockWidgetControls(self):
@@ -116,14 +120,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.coords_array = []
         self.colors = []
         self.normals = []
+        polygons, normals, colors = self.getMapPolygons()
+        self.map_data = self.preparePolygons(polygons, normals, colors)
+
         polygons, normals, colors = self.getLightSourceCoords()
         self.light_data = self.preparePolygons(polygons, normals, colors)
         if self.show_light_lines:
             lines, line_colors = self.getLightLines()
             self.light_lines_data = self.prepareLines(lines, line_colors)
 
-        polygons, normals, colors = self.getMapPolygons()
-        self.map_data = self.preparePolygons(polygons, normals, colors)
         if self.show_grid:
             lines, line_colors = self.getGrid()
             self.grid_data = self.prepareLines(lines, line_colors)
@@ -193,7 +198,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return [(lon, value, lat) for lon, lat, value in polygon]
 
     def normalizeLat(self, lat):
-        return (lat - self.min_lat) / (self.max_lat - self.min_lat)
+        return (self.max_lat - lat) / (self.max_lat - self.min_lat)
 
     def normalizeLon(self, lon):
         return (lon - self.min_lon) / (self.max_lon - self.min_lon)
@@ -253,9 +258,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return contour
 
     def getLightLines(self):
-        lines = (((self.light_pos.x(), 0, -100), (self.light_pos.x(), 0, 100)),
-                 ((-100, 0, self.light_pos.z()), (100, 0, self.light_pos.z())),
-                 ((self.light_pos.x(), 0, self.light_pos.z()),
+        if self.max_val == self.min_val:
+            v = 0
+        else:
+            v = self.normalizeValue(
+                self.min_val - (self.max_val - self.min_val) * 0.1)
+        lines = (((self.light_pos.x(), v, -100), (self.light_pos.x(), v, 100)),
+                 ((-100, v, self.light_pos.z()), (100, v, self.light_pos.z())),
+                 ((self.light_pos.x(), v, self.light_pos.z()),
                   (self.light_pos.x(), self.light_pos.y(),
                    self.light_pos.z())))
         line_colors = [(self.light_line_color, self.light_line_color)
@@ -332,6 +342,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             res = func(self, *args, **kwargs)
             self.elevationWidget.updatePos(
                 self.denormalizeValue(self.camera_pos.y()))
+            self.minimapWidget.updateCameraInfo(self.camera_pos,
+                                                self.camera_rot)
             return res
         return wrapper
 
@@ -362,7 +374,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def loadScene(self):
         width, height = self.openGLWidget.width(), self.openGLWidget.height()
         view = max(width, height)
-        GL.glViewport(0, 0, view, view)
+        GL.glViewport(int((width - view) / 2), int((height - view) / 2),
+                      view, view)
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
@@ -372,7 +385,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateMatrices(self):
         proj = QMatrix4x4()
         if self.perspectiveRadioButton.isChecked():
-            proj.frustum(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
+            proj.frustum(-0.25, 0.25, -0.3, 0.2, 0.7, 20)
         else:
             proj.ortho(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
         modelview = QMatrix4x4()

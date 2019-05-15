@@ -161,7 +161,7 @@ class GeoTIFFProcessor:
             data = data.resize(new_shape, cval=True)
         return data
 
-    def get_contour(self, data=None, *args, **kwargs):
+    def get_contour(self, data=None, plot=False, *args, **kwargs):
         def get_lon(x):
             return x_start + x * data.x_cell_size
 
@@ -174,11 +174,16 @@ class GeoTIFFProcessor:
         lonmin, lonmax, latmin, latmax = self.get_borders(data)
         x_start = lonmin if data.x_cell_size > 0 else lonmax
         y_start = latmin if data.y_cell_size > 0 else latmax
-        X = [i for i in range(0, xlen)]
-        Y = [i for i in range(0, ylen)]
+        X = [i for i in range(0, xlen)] if data.x_cell_size > 0 \
+            else [i for i in range(xlen - 1, -1, -1)]
+        Y = [i for i in range(0, ylen)] if data.y_cell_size > 0 \
+            else [i for i in range(ylen - 1, -1, -1)]
         X, Y = np.meshgrid(X, Y)
         Z = data.raster[Y, X]
-        contour = plt.contour(X, Y, Z, *args, **kwargs)
+        if plot:
+            contour = self.ax.contour(X, Y, Z, *args, **kwargs)
+        else:
+            contour = plt.contour(X, Y, Z, *args, **kwargs)
 
         result = []
         for level, coll in zip(contour.levels, contour.collections):
