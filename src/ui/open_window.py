@@ -2,10 +2,10 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import \
     NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QDialog, QFileDialog
+from PyQt5.QtWidgets import QMainWindow, QFileDialog
 
 from api import GeoTIFFProcessor
-from ui_compiled.open_dialog import Ui_OpenDialog
+from ui_compiled.open_window import Ui_OpenWindow
 
 from .loading_dialog import LoadingWrapper
 from .main_window import MainWindow
@@ -13,12 +13,15 @@ from .main_window import MainWindow
 __all__ = ['OpenDialog']
 
 
-class OpenDialog(QDialog, Ui_OpenDialog):
+class OpenDialog(QMainWindow, Ui_OpenWindow):
     params_changed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
+        self.splitter.setStretchFactor(0, 2)
+        self.splitter.setStretchFactor(1, 4)
+
         self.openButton.clicked.connect(self.on_open)
         self.previewButton.clicked.connect(self.on_preview)
         self.saveButton.clicked.connect(self.on_save)
