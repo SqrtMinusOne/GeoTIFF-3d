@@ -14,6 +14,7 @@ __all__ = ['MainWindow']
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, processor, df, parent=None):
         super().__init__(parent)
+        self.parent = parent
         self.processor = processor
         # Data
         self.df = df
@@ -93,6 +94,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.elevationWidgetLayout.addWidget(self.elevationWidget)
         self.minimapLayout.addWidget(self.minimapWidget)
         self.mapDockWidgetControls()
+
+        self.actionOpenAnother.triggered.connect(self.onOpenAnother)
+
+    def onOpenAnother(self):
+        self.parent.show()
+        self.hide()
+        self.deleteLater()
 
     def mapDockWidgetControls(self):
         self.dock_widgets = [

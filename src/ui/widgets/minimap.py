@@ -157,6 +157,7 @@ class MinimapGraphWidget(QGraphicsView):
                 'top': 0.9
             }
         }
+        self.contour_kwargs = {'levels': 10, 'linewidths': 1}
         self.x_threshold = 0
         self.y_threshold = 0
         self.big_canvas = True
@@ -179,17 +180,16 @@ class MinimapGraphWidget(QGraphicsView):
         x_threshold, y_threshold = self.getThresholds()
         if self.x_threshold != x_threshold or self.y_threshold != y_threshold:
             self.processor.ax.cla()
+            self.processor.get_contour(plot=True, **self.contour_kwargs)
             if x_threshold == 0 or y_threshold == 0:
                 plt.subplots_adjust(**self.cnv_x_thresholds[0],
                                     **self.cnv_y_thresholds[0])
-                self.processor.get_contour(plot=True)
                 self.processor.ax.set_xticks([], [])
                 self.processor.ax.set_yticks([], [])
             else:
                 plt.subplots_adjust(
                     **self.cnv_x_thresholds[x_threshold],
                     **self.cnv_y_thresholds[y_threshold])
-                self.processor.get_contour(plot=True)
             self.x_threshold, self.y_threshold = x_threshold, y_threshold
         super().resizeEvent(event)
 
