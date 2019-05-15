@@ -1,7 +1,7 @@
 import georasters as gr
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, colors
 from matplotlib.backends.backend_qt5agg import \
     FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
@@ -161,6 +161,23 @@ class GeoTIFFProcessor:
             data = data.resize(new_shape, cval=True)
         return data
 
+    def _contour_cmap(self):
+        cdict = {
+                    'red': [
+                        (0.0, 0.0, 0.0),
+                        (1.0, 1.0, 1.0)
+                    ],
+                    'green': [
+                        (0.0, 1.0, 1.0),
+                        (1.0, 0.0, 0.0)
+                    ],
+                    'blue': [
+                        (0.0, 0.0, 0.0),
+                        (1.0, 0.0, 0.0)
+                    ]
+                }
+        return colors.LinearSegmentedColormap('rg', cdict, N=256)
+
     def get_contour(self, data=None, plot=False, *args, **kwargs):
         def get_lon(x):
             return x_start + x * data.x_cell_size
@@ -181,7 +198,16 @@ class GeoTIFFProcessor:
         X, Y = np.meshgrid(X, Y)
         Z = data.raster[Y, X]
         if plot:
-            contour = self.ax.contour(X, Y, Z, *args, **kwargs)
+            contour = self.ax.contour(X, Y, Z, cmap=self._contour_cmap(),
+                                      *args, **kwargs)
+            xticks = [i for i in np.linspace(0, xlen - 1, 10, dtype=int)]
+            yticks = [i for i in np.linspace(0, ylen - 1, 10, dtype=int)]
+            xtick_labels = [f"{get_lon(i):.2f}" for i in xticks]
+            ytick_labels = [f"{get_lat(i):.2f}" for i in yticks]
+            self.ax.set_xticks(xticks)
+            self.ax.set_xticklabels(xtick_labels, rotation=90)
+            self.ax.set_yticks(yticks)
+            self.ax.set_yticklabels(ytick_labels)
         else:
             contour = plt.contour(X, Y, Z, *args, **kwargs)
 
