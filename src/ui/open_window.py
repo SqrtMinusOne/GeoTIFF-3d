@@ -133,7 +133,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         """При нажатии на OK"""
         if self.thread is None:
             self.thread = self.processor.PreprocessThread(
-                self.processor, self, **self.proc_params())
+                self.processor, True, self, **self.proc_params())
             self.loading = LoadingWrapper(self.thread)
             self.thread.df_ready.connect(self.on_normals_ready)
             self.loading.start()

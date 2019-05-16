@@ -35,8 +35,6 @@ class CameraItem(QGraphicsItem):
     def __init__(self, processor, pos: QVector3D, rot: QVector3D, parent=None):
         super().__init__(parent)
         self.processor = processor
-        self.min_lon, self.max_lon, self.min_lat, self.max_lat \
-            = processor.get_borders()
         self.pos = pos
         self.rot = QVector3D(rot)
         self.rot.setY(0)
@@ -107,8 +105,6 @@ class MinimapGraphWidget(QGraphicsView):
                  parent=None):
         super().__init__(parent)
         self.processor = processor
-        self.min_lon, self.max_lon, self.min_lat, self.max_lat \
-            = processor.get_borders()
         self.pos = position
         self.rot = rotation
         self.resize(width, height)

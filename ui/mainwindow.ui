@@ -322,6 +322,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="realPropCheckBox">
+       <property name="text">
+        <string>Real proportion of height to lat</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QLabel" name="label_6">
        <property name="text">
         <string>Transparency</string>
