@@ -7,8 +7,22 @@ from PyQt5.QtWidgets import QMainWindow
 
 from ui.widgets import ElevationGraphWidget, MinimapGraphWidget
 from ui_compiled.mainwindow import Ui_MainWindow
+import os
+import sys
+
 
 __all__ = ['MainWindow']
+
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -321,10 +335,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.initVertexArrays()
 
     def setUpShaders(self):
-        self.shaders.addShaderFromSourceFile(QOpenGLShader.Vertex,
-                                             'shaders/shader.vert')
-        self.shaders.addShaderFromSourceFile(QOpenGLShader.Fragment,
-                                             'shaders/shader.frag')
+        self.shaders.addShaderFromSourceFile(
+            QOpenGLShader.Vertex, resource_path('shaders/shader.vert'))
+        self.shaders.addShaderFromSourceFile(
+            QOpenGLShader.Fragment, resource_path('shaders/shader.frag'))
         self.shaders.link()
         self.shaders.bind()
 

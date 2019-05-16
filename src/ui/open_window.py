@@ -107,6 +107,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
     def init_matplotlib(self):
         self.canvas = self.processor.init_canvas()
         self.nav_toolbar = NavigationToolbar(self.canvas, self)
+        self.previewLabel.deleteLater()
         self.previewLayout.removeWidget(self.previewLabel)
         self.previewLayout.addWidget(self.canvas)
         self.previewLayout.addWidget(self.nav_toolbar)
