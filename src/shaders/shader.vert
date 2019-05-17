@@ -16,6 +16,7 @@ out vec3 Position;
 out vec4 Color;
 
 vec3 scaleNorm(in vec3 norm){
+    norm = normalize(norm);
     float a = norm.x;
     float b = norm.y;
     float c = norm.z;
@@ -28,8 +29,8 @@ vec3 scaleNorm(in vec3 norm){
         p3 = vec3(-c / a, 0., 1.); //6
     }
     else if (c != 0.) {
-        p2 = vec3(0., 1., -b / c); //1
-        p3 = vec3(1., 0., -a / c); //5
+        p2 = vec3(1., 0., -a / c); //5
+        p3 = vec3(0., 1., -b / c); //1
     }
     else {
         p2 = vec3(0., -c / b, 1.); //2
@@ -37,17 +38,20 @@ vec3 scaleNorm(in vec3 norm){
     }
     p2 = p2 * scale;
     p3 = p3 * scale;
-    vec3 scaled_norm = cross(p2, p3);
-    return normalize(scaled_norm);
+    vec3 scaled_norm = normalize(cross(p2, p3));
+    if (dot(norm, scaled_norm) < 0.) {
+        scaled_norm = -scaled_norm;
+    }
+    return scaled_norm;
 }
 
 void main(){
     float k = 0.1;
     vec3 pos = vec3(VertexPosition);
     vec3 norm = vec3(v_normal);
-    if (scaleEnabled)  {
+    if (scaleEnabled && scale != vec3(1, 1, 1))  {
         pos = (pos - center) * scale + center;
-        //norm = scaleNorm(norm);
+        norm = scaleNorm(norm);
     }
     
     Position = pos;

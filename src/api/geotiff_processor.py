@@ -196,10 +196,16 @@ class GeoTIFFProcessor:
 
     # ==================== NORMALIZATION ====================
     def normalizeLat(self, lat):
-        return (self.max_lat - lat) / (self.max_lat - self.min_lat)
+        if self.data.y_cell_size < 0:
+            return (self.max_lat - lat) / (self.max_lat - self.min_lat)
+        else:
+            return (lat - self.min_lat) / (self.max_lat - self.min_lat)
 
     def normalizeLon(self, lon):
-        return (lon - self.min_lon) / (self.max_lon - self.min_lon)
+        if self.data.x_cell_size < 0:
+            return (self.max_lon - lon) / (self.min_lon - self.max_lon)
+        else:
+            return (lon - self.min_lon) / (self.max_lon - self.min_lon)
 
     def normalizeValue(self, value):
         return (value - self.min_val) / (self.max_val - self.min_val)

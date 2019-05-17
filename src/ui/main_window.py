@@ -1,3 +1,6 @@
+import os
+import sys
+
 import numpy as np
 from OpenGL import GL
 from PyQt5.QtCore import QPoint, Qt
@@ -7,8 +10,6 @@ from PyQt5.QtWidgets import QMainWindow
 
 from ui.widgets import ElevationGraphWidget, MinimapGraphWidget
 from ui_compiled.mainwindow import Ui_MainWindow
-import os
-import sys
 
 __all__ = ['MainWindow']
 
@@ -201,7 +202,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return polygons, normals, colors
 
     def getColorByValue(self, value):
-        hue = 120 * value / 360
+        hue = 120 * (1 - value) / 360
         color = QColor.fromHslF(hue, 1, 0.5)
         color_vec = QVector4D(color.redF(), color.greenF(), color.blueF(), 0.5)
         return color_vec
@@ -371,9 +372,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def wrapper(self, *args, **kwargs):
             res = func(self, *args, **kwargs)
             self.elevationWidget.updatePos(
-                self.processor.denormalizeValue(self.camera_pos.y()))
-            self.minimapWidget.updateCameraInfo(self.camera_pos,
-                                                self.camera_rot)
+                self.processor.denormalizeValue(self.camera_pos.y() *
+                                                self.scale_vec.y()))
+            self.minimapWidget.updateCameraInfo(
+                self.camera_pos * self.scale_vec, self.camera_rot)
             return res
 
         return wrapper
@@ -440,12 +442,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.drawPreparedPolygons(*self.light_data)
         if self.show_light_lines:
             self.drawPreparedLines(*self.light_lines_data)
-        # self.shaders.setUniformValue('scaleEnabled', True)
+
+        self.shaders.setUniformValue('scaleEnabled', True)
         if self.show_grid:
             self.drawPreparedLines(*self.grid_data)
+
         # self.drawPreparedLines(*self.normal_data)
         self.shaders.setUniformValue('phongModel', True)
         self.drawPreparedPolygons(*self.map_data)
+
         if self.show_contour:
             self.shaders.setUniformValue('phongModel', False)
             self.drawPreparedLineStrips(self.contour_data)
