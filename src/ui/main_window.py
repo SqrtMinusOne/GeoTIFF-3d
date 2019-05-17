@@ -420,10 +420,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def updateMatrices(self):
         proj = QMatrix4x4()
+        coef = 0.01
+        center_x = 0
+        center_y = 0
+        projection = (-1 * coef + center_x, 1 * coef + center_x,
+                      -1 * coef + center_y, 1 * coef + center_y,
+                      2.8 * coef, 20)
         if self.perspectiveRadioButton.isChecked():
-            proj.frustum(-0.25, 0.25, -0.3, 0.2, 0.7, 20)
+            proj.frustum(*projection)
         else:
-            proj.ortho(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
+            proj.ortho(*projection)
         modelview = QMatrix4x4()
         modelview.lookAt(self.camera_pos, self.camera_pos + self.camera_rot,
                          QVector3D(0, 1, 0))

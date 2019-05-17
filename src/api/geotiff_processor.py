@@ -286,8 +286,13 @@ class GeoTIFFProcessor:
                                       **kwargs)
             xticks = [i for i in np.linspace(0, xlen - 1, 10, dtype=int)]
             yticks = [i for i in np.linspace(0, ylen - 1, 10, dtype=int)]
+            if data.x_cell_size < 0:
+                xticks.reverse()
+            if data.y_cell_size < 0:
+                yticks.reverse()
             xtick_labels = [f"{get_lon(i):.2f}" for i in xticks]
             ytick_labels = [f"{get_lat(i):.2f}" for i in yticks]
+            self.ax.invert_yaxis()
             self.ax.set_xticks(xticks)
             self.ax.set_xticklabels(xtick_labels, rotation=90)
             self.ax.set_yticks(yticks)

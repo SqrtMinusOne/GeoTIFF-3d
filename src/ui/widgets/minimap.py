@@ -60,7 +60,7 @@ class CameraItem(QGraphicsItem):
 
         rect = getRect(widget)
         x = self.pos.x() * rect.width() + rect.x()
-        y = (1 - self.pos.z()) * rect.height() + rect.y()
+        y = self.pos.z() * rect.height() + rect.y()
         x, y = max(x, 0), max(y, 0)
         x, y = min(x, widget.width()), min(y, widget.height())
 
@@ -69,7 +69,7 @@ class CameraItem(QGraphicsItem):
         dangle = np.pi / 180 * 30
 
         point = QPoint(x, y)
-        angle = -cart2pol(self.rot.x(), self.rot.z())[1]
+        angle = cart2pol(self.rot.x(), self.rot.z())[1]
         delta_1 = QPoint(*pol2cart(arr_rad, angle - dangle))
         delta_2 = QPoint(*pol2cart(arr_rad, angle + dangle))
 
