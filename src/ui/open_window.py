@@ -1,8 +1,10 @@
+import os
+
 import numpy as np
 from matplotlib.backends.backend_qt5agg import \
     NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QMainWindow, QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QMainWindow
 
 from api import GeoTIFFProcessor
 from ui_compiled.open_window import Ui_OpenWindow
@@ -78,9 +80,8 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
 
     def on_open(self):
         """Выполнить при открытии файла"""
-        name, filter_ = QFileDialog.getOpenFileName(self,
-                                                    'Открыть файл',
-                                                    filter='*.tif')
+        name, filter_ = QFileDialog.getOpenFileName(
+            self, 'Открыть файл', os.path.expanduser('~'), filter='*.tif')
         if len(name) > 0:
             [item.setEnabled(True) for item in self.activate]
             self.processor.open_file(name)
@@ -163,8 +164,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.hide()
 
     def on_save(self):
-        filename, filter_ = QFileDialog.getSaveFileName(self,
-                                                        'Сохранить',
-                                                        filter='*.tif')
+        filename, filter_ = QFileDialog.getSaveFileName(
+            self, 'Сохранить', os.path.expanduser('~'), filter='*.tif')
         if len(filename) > 0:
             self.processor.save(filename, **self.proc_params())
