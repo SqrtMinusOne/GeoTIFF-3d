@@ -47,6 +47,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.rot_center = QVector3D(0.5, 0.5, 0.5)
         self.camera_rot = QVector3D(0, 0, 1)
         self.scale_vec = QVector3D(1, 1, 1)
+        self.real_prop = processor.get_real_scaling()
 
         self.light_pos = QVector3D(self.xLightSpinBox.value(),
                                    self.yLightSpinBox.value(),
@@ -371,9 +372,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateCameraInfo(func):
         def wrapper(self, *args, **kwargs):
             res = func(self, *args, **kwargs)
+            coef = 1 if not self.realPropCheckBox.isChecked() \
+                else self.real_prop
             self.elevationWidget.updatePos(
-                self.processor.denormalizeValue(self.camera_pos.y() *
-                                                self.scale_vec.y()))
+                self.processor.denormalizeValue(self.camera_pos.y() /
+                                                (self.scale_vec.y()) * coef))
             self.minimapWidget.updateCameraInfo(
                 self.camera_pos * self.scale_vec, self.camera_rot)
             return res
@@ -480,6 +483,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.xScaleSpinBox.valueChanged.connect(lambda x: self.scaleView(x=x))
         self.yScaleSpinBox.valueChanged.connect(lambda y: self.scaleView(y=y))
         self.zScaleSpinBox.valueChanged.connect(lambda z: self.scaleView(z=z))
+        self.realPropCheckBox.stateChanged.connect(
+            lambda: self.scaleView(y=self.yScaleSpinBox.value()))
 
         # Light
         self.ambientSlider.valueChanged.connect(lambda ambient: self.setLight(
@@ -583,11 +588,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.camera_pos.setY(self.camera_pos.y() + y * move_coef)
 
     @updateGL
+    @updateCameraInfo
     def scaleView(self, x=None, y=None, z=None):
         if x:
             self.scale_vec.setX(x)
         if y:
-            self.scale_vec.setY(y)
+            if self.realPropCheckBox.isChecked():
+                self.scale_vec.setY(y * self.real_prop)
+            else:
+                self.scale_vec.setY(y)
         if z:
             self.scale_vec.setZ(z)
 

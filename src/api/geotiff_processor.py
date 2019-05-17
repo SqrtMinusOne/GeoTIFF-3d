@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt5agg import \
     FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
+from haversine import haversine, Unit
 
 from loading_wrapper import LoadingThread
 
@@ -42,7 +43,7 @@ class GeoTIFFProcessor:
 
             # Extraction
             if df is None:
-                self.proc = GeoTIFFProcessor(self.proc._modify_data(
+                self.proc = GeoTIFFProcessor(self.proc.modify_data(
                     *self.args, **self.kwargs))
                 df = self.proc.extract_to_pandas()
                 self.updateStatus.emit('Calulating normals')
@@ -83,7 +84,6 @@ class GeoTIFFProcessor:
         if data is None:
             self.borders = 0., 0., 0., 0.
             self.min_val = self.max_val = 0
-            self.xsize, self.ysize = 0, 0
         else:
             self.borders = self.get_borders(data)
             self.min_val, self.max_val = self.get_value_limits(data)
@@ -123,12 +123,19 @@ class GeoTIFFProcessor:
         """
         data = self.data if data_ is None else data_
         xmin, xsize, xrot, ymax, yrot, ysize = data.geot
-        self.xsize, self.ysize = xsize, ysize
         xlen = data.count(axis=0)[0] * xsize
         ylen = data.count(axis=1)[0] * ysize
         xmax = xmin + xlen
         ymin = ymax + ylen
         return xmin, xmax, ymin, ymax
+
+    def get_centered_borders(self, data, center):
+        min_lon, max_lon, min_lat, max_lat = self.get_borders(data)
+        cnt_lon, cnt_lat = center
+        lon_r = (max_lon - min_lon) / 2
+        lat_r = (max_lat - min_lat) / 2
+        return cnt_lon - lon_r, cnt_lon + lon_r, \
+            cnt_lat - lat_r, cnt_lat + lat_r
 
     def get_dimensions(self, data=None):
         data = self.data if data is None else data
@@ -138,14 +145,19 @@ class GeoTIFFProcessor:
 
     def get_value_limits(self, data=None):
         data = self.data if data is None else data
-        x, y = self.get_dimensions(data)
-        min_val = 1000000
-        max_val = 0
-        for i in range(x):
-            for j in range(y):
-                min_val = min(min_val, data.raster[i, j])
-                max_val = max(max_val, data.raster[i, j])
-        return min_val, max_val
+        return data.raster.min(), data.raster.max()
+
+    def get_real_scaling(self, data=None):
+        data = self.data if data is None else data
+        min_lon, max_lon, min_lat, max_lat = self.get_borders(data)
+        min_val, max_val = self.get_value_limits(data)
+        point_1 = (min_lat, min_lon)
+        point_2 = (max_lat, min_lon)
+        distance = haversine(point_1, point_2, unit=Unit.METERS)
+        if distance != 0:
+            return (max_val - min_val) / distance
+        else:
+            return 1
 
     def max_rad(self, lat, lon):
         lonmin, lonmax, latmin, latmax = self.borders
@@ -155,7 +167,11 @@ class GeoTIFFProcessor:
 
     @property
     def center(self):
-        lonmin, lonmax, latmin, latmax = self.borders
+        return self.get_center()
+
+    def get_center(self, data=None):
+        data = self.data if data is None else data
+        lonmin, lonmax, latmin, latmax = self.get_borders(data)
         return (latmax - latmin) / 2 + latmin, \
             (lonmax - lonmin) / 2 + lonmin
 
@@ -224,7 +240,7 @@ class GeoTIFFProcessor:
         return [self.normalizePoint(point) for point in polygon]
 
     # ==================== DATA PROCESSING & PANDAS ====================
-    def _modify_data(self, lat=None, lon=None, r=None, coef=1):
+    def modify_data(self, lat=None, lon=None, r=None, coef=1):
         data = self.data
         if lat and lon and r:
             data = self.data.extract(lon, lat, r)
@@ -287,7 +303,7 @@ class GeoTIFFProcessor:
         return result
 
     def extract_to_pandas(self, *args, **kwargs):
-        data = self._modify_data(*args, **kwargs)
+        data = self.modify_data(*args, **kwargs)
         return data.to_pandas()
 
     def calculate_normals(self, df, normalize=False):
@@ -340,7 +356,7 @@ class GeoTIFFProcessor:
 
     def save(self, name, *args, **kwargs):
         if self.data_loaded:
-            data = self._modify_data(*args, **kwargs)
+            data = self.modify_data(*args, **kwargs)
             data.to_tiff(name)
 
     def init_canvas(self):
@@ -348,8 +364,8 @@ class GeoTIFFProcessor:
         self.canvas = FigureCanvas(self.fig)
         return self.canvas
 
-    def draw_preview(self, *args, **kwargs):
+    def draw_preview(self, data=None, *args, **kwargs):
         self.ax.cla()
-        data = self._modify_data(*args, **kwargs)
+        data = self.modify_data(*args, **kwargs) if data is None else data
         data.plot(ax=self.ax)
         self.canvas.draw()

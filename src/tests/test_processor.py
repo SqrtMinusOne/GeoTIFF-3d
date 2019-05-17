@@ -54,7 +54,7 @@ class TestGeoTIFFProcessor(unittest.TestCase):
         # Crop
         lat, lon = proc.center
         r = proc.max_rad(lat, lon) / 2
-        data = proc._modify_data(lat, lon, r, 1)
+        data = proc.modify_data(lat, lon, r, 1)
         xlen_old, ylen_old = proc.get_dimensions()
         xlen, ylen = proc.get_dimensions(data)
         self.assertLessEqual(np.abs(xlen_old / 2 - xlen), 1)
@@ -62,13 +62,13 @@ class TestGeoTIFFProcessor(unittest.TestCase):
 
         # Make smaller
         r = proc.max_rad(lat, lon)
-        data = proc._modify_data(lat, lon, r, 0.5)
+        data = proc.modify_data(lat, lon, r, 0.5)
         xlen, ylen = proc.get_dimensions(data)
         self.assertLessEqual(np.abs(xlen_old / 2 - xlen), 1)
         self.assertLessEqual(np.abs(ylen_old / 2 - ylen), 1)
 
         # Make larger (interpolate)
-        data = proc._modify_data(lat, lon, r, 2)
+        data = proc.modify_data(lat, lon, r, 2)
         xlen, ylen = proc.get_dimensions(data)
         self.assertLessEqual(np.abs(xlen_old * 2 - xlen), 1)
         self.assertLessEqual(np.abs(ylen_old * 2 - ylen), 1)
