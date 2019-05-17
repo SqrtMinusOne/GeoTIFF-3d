@@ -33,12 +33,33 @@ class TestGeoTIFFProcessor(unittest.TestCase):
         self.assertTrue(latmin < lat < latmax)
         self.assertTrue(lonmin < lon < lonmax)
 
+        self.assertEqual(lonmin, proc.min_lon)
+        self.assertEqual(latmin, proc.min_lat)
+        self.assertEqual(lonmax, proc.max_lon)
+        self.assertEqual(latmax, proc.max_lat)
+
         r = proc.max_rad(lat, lon)
         self.assertGreater(r, 0)
 
         xlen, ylen = proc.get_dimensions()
         self.assertLessEqual(
             np.abs(xlen * ylen - proc.points_estimate(r, 1)), 1)
+
+        min_val, max_val = proc.get_value_limits()
+        self.assertLessEqual(min_val, max_val)
+        self.assertEqual(min_val, proc.min_val)
+        self.assertEqual(max_val, proc.max_val)
+
+    def test_normalize(self):
+        proc = GeoTIFFProcessor()
+        proc.open_file(SAMPLE_NAME)
+        lat, lon = proc.center
+        r = proc.max_rad(lat, lon) / 2
+        df = proc.extract_to_pandas(lat, lon, r)
+        df = proc.calculate_normals(df, normalize=True)
+        self.assertTrue(0 <= min(df['x']) <= max(df['x']) <= 1)
+        self.assertTrue(0 <= min(df['y']) <= max(df['y']) <= 1)
+        self.assertTrue(0 <= min(df['value']) <= max(df['value']) <= 1)
 
     def test_save(self):
         proc = GeoTIFFProcessor()

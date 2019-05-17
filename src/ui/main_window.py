@@ -42,26 +42,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Control & Display
         self.mouse_grabbed = False
 
-        self.camera_pos = QVector3D(0.5, 0.5, -2)
-        self.center = QVector3D(0.5, 0, 0.5)
-        self.rot_center = QVector3D(0.5, 0.5, 0.5)
-        self.camera_rot = QVector3D(0, 0, 1)
-        self.scale_vec = QVector3D(1, 1, 1)
-        self.real_prop = processor.get_real_scaling()
+        self.camera_pos = QVector3D(0.5, 0.5, -2)  # Start camera position
+        self.center = QVector3D(0.5, 0, 0.5)  # Center of object
+        self.rot_center = QVector3D(0.5, 0.5, 0.5)  # Center of rotation
+        self.camera_rot = QVector3D(0, 0, 1)  # Camera rotation
+        self.scale_vec = QVector3D(1, 1, 1)  # Object scale
+        self.real_prop = processor.get_real_scaling()  # val to lat
 
         self.light_pos = QVector3D(self.xLightSpinBox.value(),
                                    self.yLightSpinBox.value(),
                                    self.zLightSpinBox.value())
         self.ambient = self.ambientSlider.value() / 100
         self.diffuse = self.diffuseSlider.value() / 100
-        self.alpha = self.alphaSlider.value() / 100
+        self.alpha = self.alphaSlider.value() / 100  # Transparency
 
         # Drawing
         self.normals = []
         self.colors = []
         self.coords_array = []
-        self.update_light = False
-        self.update_buffer = False
+        # !> len(self.normals) == len(self.colors) == len(self.coords_array)
+
+        self.update_light = False  # Update for light is needed
+        self.update_buffer = False  # Update for whole buffer is needed
 
         self.show_grid = self.gridCheckBox.isChecked()
         self.show_contour = self.contourCheckBox.isChecked()
@@ -81,6 +83,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.openGLWidget.paintGL = self.paintGL
 
     def updateUi(self):
+        """Set up custom widgets & positions"""
         self.splitDockWidget(self.displayDockWidget, self.elevationDockWidget,
                              Qt.Vertical)
         self.splitDockWidget(self.elevationDockWidget, self.displayDockWidget,
@@ -112,11 +115,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionOpenAnother.triggered.connect(self.onOpenAnother)
 
     def onOpenAnother(self):
+        """Open another GeoTIFF file"""
         self.parent.show()
         self.hide()
         self.deleteLater()
 
     def mapDockWidgetControls(self):
+        """Show/hide dockwidgets via corresponding actions"""
         self.dock_widgets = [
             self.lightDockWidget, self.cameraDockWidget,
             self.additionalDockWidget, self.minimapDockWidget,
@@ -143,6 +148,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # ==================== PREPARATION ====================
     def prepareScene(self):
+        """Prepare data for bufferization"""
         self.coords_array = []
         self.colors = []
         self.normals = []
@@ -203,6 +209,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return polygons, normals, colors
 
     def getColorByValue(self, value):
+        """Get QVector4D-color from green (value == 0) to red (value == 1)
+        :param value: 0 - 1
+        """
         hue = 120 * (1 - value) / 360
         color = QColor.fromHslF(hue, 1, 0.5)
         color_vec = QVector4D(color.redF(), color.greenF(), color.blueF(), 0.5)
@@ -214,7 +223,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def swapPoints(self, polygon):
         return [(lon, value, lat) for lon, lat, value in polygon]
 
-    def prepareNormalLines(self, polygons, normals, colors):  # DEBUG
+    def prepareNormalLines(self, polygons, normals, colors):
+        """Normal lines for each polygon.
+        Debug only
+        """
         norm_i = 0
         start = len(self.coords_array)
         for polygon in polygons:
@@ -230,6 +242,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return start, end
 
     def preparePolygons(self, polygons, normals, colors, start_index=None):
+        """Prepare polygons for bufferization
+
+        :param polygons: a list like [(p11, p12, ...), (p21, p22, ...)]
+        :param normals: normals with number of normals equal to points
+        :param colors: colors for each point
+        :param start_index: if None, start at the end of each array.
+        Otherwise, overwrite
+        """
         assert len(normals) == len(colors)
         coords_array = []
         [[coords_array.append(list(p)) for p in polygon]
@@ -305,6 +325,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return lines, line_colors
 
     def prepareLines(self, lines, line_colors, start_index=None):
+        """Prepare lines for bufferization
+
+        :param lines: list like one for polygons
+        :param line_colors: list of colors of each line
+        :param start_index: start index
+        """
         assert len(lines) == len(line_colors)
         if start_index is None:
             data = [None] * len(lines)
@@ -353,6 +379,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shaders.bind()
 
     def initVertexArrays(self):
+        """Init buffers"""
         assert len(self.coords_array) == len(self.colors) == len(self.normals)
         GL.glVertexPointer(3, GL.GL_FLOAT, 0, self.coords_array)
         self.shaders.setAttributeArray("v_color", self.colors)
@@ -370,6 +397,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return wrapper
 
     def updateCameraInfo(func):
+        """A decorator to update camera widgets after excution
+        """
+
         def wrapper(self, *args, **kwargs):
             res = func(self, *args, **kwargs)
             coef = 1 if not self.realPropCheckBox.isChecked() \
@@ -384,6 +414,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return wrapper
 
     def updateLightData(self):
+        """Update parts of buffer used to display the light source"""
         polygons, normals, colors = self.getLightSourceCoords()
         self.preparePolygons(polygons, normals, colors, self.light_data[0])
         lines, colors = self.getLightLines()
@@ -392,6 +423,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.update_light = False
 
     def updateBuffer(self):
+        """Update the whole buffer"""
         self.prepareScene()
         self.initVertexArrays()
         self.update_buffer = False
@@ -419,13 +451,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         GL.glDepthFunc(GL.GL_LEQUAL)
 
     def updateMatrices(self):
+        """Update projection matrices"""
         proj = QMatrix4x4()
         coef = 0.01
         center_x = 0
         center_y = 0
         projection = (-1 * coef + center_x, 1 * coef + center_x,
-                      -1 * coef + center_y, 1 * coef + center_y,
-                      2.8 * coef, 20)
+                      -1 * coef + center_y, 1 * coef + center_y, 2.8 * coef,
+                      20)
         if self.perspectiveRadioButton.isChecked():
             proj.frustum(*projection)
         else:
@@ -437,6 +470,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shaders.setUniformValue("MVP", proj * modelview)
 
     def updateParams(self):
+        """Update light, alpha and scaling parameters"""
         self.shaders.setUniformValue("LightPos", self.light_pos)
         self.shaders.setUniformValue("ambientStrength", self.ambient)
         self.shaders.setUniformValue("diffuseStrength", self.diffuse)
@@ -445,6 +479,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shaders.setUniformValue("scale", self.scale_vec)
 
     def drawScene(self):
+        """Paint all the prepared data"""
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         self.shaders.setUniformValue('scaleEnabled', False)
         self.shaders.setUniformValue('phongModel', False)
@@ -477,6 +512,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # ==================== CONTROLS ====================
     def setupControls(self):
+        """Connect controls to this class' methods"""
         # Camera
         self.moveCameraUp.clicked.connect(lambda: self.moveCamera(az=1))
         self.moveCameraDown.clicked.connect(lambda: self.moveCamera(az=-1))
@@ -489,8 +525,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.xScaleSpinBox.valueChanged.connect(lambda x: self.scaleView(x=x))
         self.yScaleSpinBox.valueChanged.connect(lambda y: self.scaleView(y=y))
         self.zScaleSpinBox.valueChanged.connect(lambda z: self.scaleView(z=z))
-        self.realPropCheckBox.stateChanged.connect(
-            lambda: self.scaleView(y=self.yScaleSpinBox.value()))
+        self.realPropCheckBox.stateChanged.connect(lambda: self.scaleView(
+            y=self.yScaleSpinBox.value()))
 
         # Light
         self.ambientSlider.valueChanged.connect(lambda ambient: self.setLight(
@@ -564,10 +600,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.mouse_grabbed:
             delta = event.globalPos() - self.mouse_center
             QCursor.setPos(self.mouse_center)
-            self.moveCamera(az=delta.y() * az_sensivity,
-                            pol=delta.x() * pol_sensivity)
+            if event.buttons() == Qt.RightButton:
+                self.moveCameraAroundCenter(az=delta.y() * az_sensivity,
+                                            pol=delta.x() * pol_sensivity)
+            else:
+                self.moveCamera(az=delta.y() * az_sensivity,
+                                pol=delta.x() * pol_sensivity)
         else:
             super().mouseMoveEvent(event)
+
+    def getRotVec(self):
+        rot_matr = QMatrix4x4()
+        rot_matr.rotate(-90, 0, 1, 0)
+        rot_vec = QVector3D(self.camera_rot)
+        rot_vec.setY(0)
+        rot_vec = rot_matr * rot_vec
+        return rot_vec
 
     @updateGL
     @updateCameraInfo
@@ -575,11 +623,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         move_coef = 0.1
         rot_coef = 2
 
-        rot_matr = QMatrix4x4()
-        rot_matr.rotate(-90, 0, 1, 0)
-        rot_vec = QVector3D(self.camera_rot)
-        rot_vec.setY(0)
-        rot_vec = rot_matr * rot_vec
+        rot_vec = self.getRotVec()
 
         if az != 0 or pol != 0:
             rot_matr = QMatrix4x4()
@@ -592,6 +636,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.camera_pos += rot_vec * move_coef * x
         if y:
             self.camera_pos.setY(self.camera_pos.y() + y * move_coef)
+
+    @updateGL
+    @updateCameraInfo
+    def moveCameraAroundCenter(self, az=0, pol=0):
+        rot_coef = 4
+
+        rot_vec = self.getRotVec()
+        rot_matr = QMatrix4x4()
+        rot_matr.rotate(rot_coef * az, rot_vec)
+        rot_matr.rotate(rot_coef * pol, 0, 1, 0)
+        rot_center = self.rot_center * self.scale_vec
+
+        self.camera_pos -= rot_center
+        self.camera_pos = rot_matr * self.camera_pos
+        self.camera_pos += rot_center
+
+        self.camera_rot = -self.camera_pos + rot_center
 
     @updateGL
     @updateCameraInfo
