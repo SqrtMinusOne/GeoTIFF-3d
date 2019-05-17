@@ -9,6 +9,6 @@ IF EXIST src\ui_compiled (
 )
 FOR %%I in (ui\*.*) DO (
 	echo Converting %%I
-	call pyuic5 %%I --import_from res_compiled >> src\ui_compiled\%%~nI.py
+	call pyuic5 %%I --import-from res_compiled >> src\ui_compiled\%%~nI.py
 )
 echo Finished

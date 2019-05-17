@@ -1,4 +1,4 @@
-#version 320 es
+#version 300 es
 #undef lowp
 #undef mediump
 #undef highp
