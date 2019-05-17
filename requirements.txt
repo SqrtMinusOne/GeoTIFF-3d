@@ -4,3 +4,4 @@ pandas
 pyopengl
 matplotlib
 georasters
+haversine

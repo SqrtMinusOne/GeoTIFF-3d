@@ -150,6 +150,9 @@
         </item>
         <item row="1" column="0">
          <widget class="QDoubleSpinBox" name="xLightSpinBox">
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
           <property name="minimum">
            <double>-100.000000000000000</double>
           </property>
@@ -163,6 +166,9 @@
         </item>
         <item row="1" column="1">
          <widget class="QDoubleSpinBox" name="yLightSpinBox">
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
           <property name="minimum">
            <double>-100.000000000000000</double>
           </property>
@@ -176,6 +182,9 @@
         </item>
         <item row="1" column="2">
          <widget class="QDoubleSpinBox" name="zLightSpinBox">
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
           <property name="minimum">
            <double>-100.000000000000000</double>
           </property>
@@ -319,6 +328,13 @@
          </widget>
         </item>
        </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="realPropCheckBox">
+       <property name="text">
+        <string>Real proportion of height to lat</string>
+       </property>
       </widget>
      </item>
      <item>

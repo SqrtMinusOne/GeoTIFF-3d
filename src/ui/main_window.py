@@ -1,3 +1,6 @@
+import os
+import sys
+
 import numpy as np
 from OpenGL import GL
 from PyQt5.QtCore import QPoint, Qt
@@ -7,9 +10,6 @@ from PyQt5.QtWidgets import QMainWindow
 
 from ui.widgets import ElevationGraphWidget, MinimapGraphWidget
 from ui_compiled.mainwindow import Ui_MainWindow
-import os
-import sys
-
 
 __all__ = ['MainWindow']
 
@@ -32,9 +32,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.processor = processor
         # Data
         self.df = df
-        self.min_val = self.max_val = 0
-        self.min_lon = self.max_lon = self.min_lat = self.max_lat = 0
-        self.val_lon_proportion = 1  # TODO?
 
         # UI
         self.setupUi(self)
@@ -46,8 +43,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.mouse_grabbed = False
 
         self.camera_pos = QVector3D(0.5, 0.5, -2)
+        self.center = QVector3D(0.5, 0, 0.5)
+        self.rot_center = QVector3D(0.5, 0.5, 0.5)
         self.camera_rot = QVector3D(0, 0, 1)
         self.scale_vec = QVector3D(1, 1, 1)
+        self.real_prop = processor.get_real_scaling()
 
         self.light_pos = QVector3D(self.xLightSpinBox.value(),
                                    self.yLightSpinBox.value(),
@@ -86,25 +86,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.splitDockWidget(self.elevationDockWidget, self.displayDockWidget,
                              Qt.Vertical)
 
-        self.tabifyDockWidget(self.elevationDockWidget,
-                              self.minimapDockWidget)
-        self.tabifyDockWidget(self.displayDockWidget,
-                              self.lightDockWidget)
-        self.tabifyDockWidget(self.projDockWidget,
-                              self.additionalDockWidget)
-        self.tabifyDockWidget(self.elevationDockWidget,
-                              self.cameraDockWidget)
+        self.tabifyDockWidget(self.elevationDockWidget, self.minimapDockWidget)
+        self.tabifyDockWidget(self.displayDockWidget, self.lightDockWidget)
+        self.tabifyDockWidget(self.projDockWidget, self.additionalDockWidget)
+        self.tabifyDockWidget(self.elevationDockWidget, self.cameraDockWidget)
         self.lightDockWidget.raise_()
         self.additionalDockWidget.raise_()
         self.elevationDockWidget.raise_()
 
         self.elevationWidget = ElevationGraphWidget(
-            self.min_val, self.max_val,
-            self.denormalizeValue(self.camera_pos.y()),
-            width=240, height=100)
-        self.minimapWidget = MinimapGraphWidget(
-            self.processor, self.camera_pos, self.camera_rot,
-            width=240, height=100)
+            self.processor.min_val,
+            self.processor.max_val,
+            self.processor.denormalizeValue(self.camera_pos.y()),
+            width=240,
+            height=100)
+        self.minimapWidget = MinimapGraphWidget(self.processor,
+                                                self.camera_pos,
+                                                self.camera_rot,
+                                                width=240,
+                                                height=100)
         self.elevationWidgetLayout.addWidget(self.elevationWidget)
         self.minimapLayout.addWidget(self.minimapWidget)
         self.mapDockWidgetControls()
@@ -121,17 +121,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.lightDockWidget, self.cameraDockWidget,
             self.additionalDockWidget, self.minimapDockWidget,
             self.displayDockWidget, self.projDockWidget,
-            self.elevationDockWidget]
+            self.elevationDockWidget
+        ]
         self.dock_actions = [
             self.actionShowLightSourceDW, self.actionShowCameraDW,
             self.actionShowAdditionalDW, self.actionShowMinimapDW,
             self.actionShowDisplayDW, self.actionShowProjectionDW,
-            self.actionShowElevationDW]
+            self.actionShowElevationDW
+        ]
         for dock_widget, action in zip(self.dock_widgets, self.dock_actions):
+
             def wrapper(action):
                 def dock_widget_close_event(event):
                     action.setChecked(False)
                     event.accept()
+
                 return dock_widget_close_event
 
             dock_widget.closeEvent = wrapper(action)
@@ -144,6 +148,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.normals = []
         polygons, normals, colors = self.getMapPolygons()
         self.map_data = self.preparePolygons(polygons, normals, colors)
+        # self.normal_data = self.prepareNormalLines(polygons, normals, colors)
 
         polygons, normals, colors = self.getLightSourceCoords()
         self.light_data = self.preparePolygons(polygons, normals, colors)
@@ -187,51 +192,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return polygons, normals_vec, colors
 
     def getMapPolygons(self):
-        self.min_lon = min(self.df['x'])
-        self.max_lon = max(self.df['x'])
-        self.min_lat = min(self.df['y'])
-        self.max_lat = max(self.df['y'])
-        self.min_val = min(self.df['value'])
-        self.max_val = max(self.df['value'])
         polygons, normals, colors = [], [], []
         for polygon, normal in self.processor.polygon_generator(self.df):
-            polygons.append(self.swapPoints(self.normalizePoints(polygon)))
-            [normals.append(QVector3D(*normal)) for _ in polygon]
+            polygons.append(self.swapPoints(polygon))
+            [
+                normals.append(QVector3D(*self.swapPoint(*normal)))
+                for _ in polygon
+            ]
             [colors.append(self.getColorByValue(val)) for x, y, val in polygon]
         return polygons, normals, colors
 
     def getColorByValue(self, value):
-        value = (self.max_val - value) / (self.max_val - self.min_val)
-        hue = 120 * value / 360
+        hue = 120 * (1 - value) / 360
         color = QColor.fromHslF(hue, 1, 0.5)
         color_vec = QVector4D(color.redF(), color.greenF(), color.blueF(), 0.5)
         return color_vec
 
-    def normalizePoints(self, polygon):
-        normalized = []
-        for lon, lat, value in polygon:
-            lon_ = self.normalizeLon(lon)
-            lat_ = self.normalizeLat(lat)
-            value_ = self.normalizeValue(value) * self.val_lon_proportion
-            normalized.append((lon_, lat_, value_))
-        return normalized
+    def swapPoint(self, lon, lat, value):
+        return lon, value, lat
 
     def swapPoints(self, polygon):
         return [(lon, value, lat) for lon, lat, value in polygon]
 
-    def normalizeLat(self, lat):
-        return (self.max_lat - lat) / (self.max_lat - self.min_lat)
-
-    def normalizeLon(self, lon):
-        return (lon - self.min_lon) / (self.max_lon - self.min_lon)
-
-    def normalizeValue(self, value):
-        return (value - self.min_val) / (self.max_val - self.min_val)
-
-    def denormalizeValue(self, value):
-        return value * (self.max_val - self.min_val) + self.min_val
+    def prepareNormalLines(self, polygons, normals, colors):  # DEBUG
+        norm_i = 0
+        start = len(self.coords_array)
+        for polygon in polygons:
+            point = polygon[0]
+            normal = normals[norm_i]
+            # color = colors[norm_i]
+            color = QVector4D(1, 1, 1, 1)
+            point_2 = QVector3D(*point) + normal * 0.04
+            point_2 = (point_2.x(), point_2.y(), point_2.z())
+            self.prepareLine((point, point_2), [color] * 2)
+            norm_i += len(polygon)
+        end = len(self.coords_array)
+        return start, end
 
     def preparePolygons(self, polygons, normals, colors, start_index=None):
+        assert len(normals) == len(colors)
         coords_array = []
         [[coords_array.append(list(p)) for p in polygon]
          for polygon in polygons]
@@ -251,21 +250,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # LINES
     def getGrid(self):
-        assert self.min_lat != self.max_lat and self.min_val != self.max_val
-        value = self.min_val - (self.max_val - self.min_val) * 0.1
+        assert self.processor.min_lat != self.processor.max_lat \
+            and self.processor.min_val != self.processor.max_val
+        value = self.processor.min_val - \
+            (self.processor.max_val - self.processor.min_val) * 0.1
 
         lines = []
-        for lat in np.linspace(self.min_lat, self.max_lat, self.grid_freq):
-            line = ((self.min_lon, lat, value), (self.max_lon, lat, value))
+        for lat in np.linspace(self.processor.min_lat, self.processor.max_lat,
+                               self.grid_freq):
+            line = ((self.processor.min_lon, lat, value),
+                    (self.processor.max_lon, lat, value))
             lines.append(line)
-        for lon in np.linspace(self.min_lon, self.max_lon, self.grid_freq):
-            line = ((lon, self.min_lat, value), (lon, self.max_lat, value))
+        for lon in np.linspace(self.processor.min_lon, self.processor.max_lon,
+                               self.grid_freq):
+            line = ((lon, self.processor.min_lat, value),
+                    (lon, self.processor.max_lat, value))
             lines.append(line)
 
         # lines.append(((self.min_lon, self.min_lat, self.min_val),
         #              (self.min_lon, self.min_lat, self.max_val)))
 
-        lines = [self.swapPoints(self.normalizePoints(line)) for line in lines]
+        lines = [
+            self.swapPoints(self.processor.normalizePoints(line))
+            for line in lines
+        ]
         line_colors = [(self.grid_color, self.grid_color) for _ in lines]
         return lines, line_colors
 
@@ -273,18 +281,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         lev_lines = self.processor.get_contour(levels=self.contour_levels)
         contour = []
         for level, line in lev_lines:
-            line = [(self.normalizeLon(lon), self.normalizeValue(level + 10),
-                     self.normalizeLat(lat)) for lon, lat in line]
+            line = [(self.processor.normalizeLon(lon),
+                     self.processor.normalizeValue(level + 10),
+                     self.processor.normalizeLat(lat)) for lon, lat in line]
             colors = [self.contour_color] * len(line)
             contour.append(self.prepareLine(line, colors))
         return contour
 
     def getLightLines(self):
-        if self.max_val == self.min_val:
+        if self.processor.max_val == self.processor.min_val:
             v = 0
         else:
-            v = self.normalizeValue(
-                self.min_val - (self.max_val - self.min_val) * 0.1)
+            v = self.processor.normalizeValue(
+                self.processor.min_val -
+                (self.processor.max_val - self.processor.min_val) * 0.1)
         lines = (((self.light_pos.x(), v, -100), (self.light_pos.x(), v, 100)),
                  ((-100, v, self.light_pos.z()), (100, v, self.light_pos.z())),
                  ((self.light_pos.x(), v, self.light_pos.z()),
@@ -362,11 +372,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateCameraInfo(func):
         def wrapper(self, *args, **kwargs):
             res = func(self, *args, **kwargs)
+            coef = 1 if not self.realPropCheckBox.isChecked() \
+                else self.real_prop
             self.elevationWidget.updatePos(
-                self.denormalizeValue(self.camera_pos.y()))
-            self.minimapWidget.updateCameraInfo(self.camera_pos,
-                                                self.camera_rot)
+                self.processor.denormalizeValue(self.camera_pos.y() /
+                                                (self.scale_vec.y()) * coef))
+            self.minimapWidget.updateCameraInfo(
+                self.camera_pos * self.scale_vec, self.camera_rot)
             return res
+
         return wrapper
 
     def updateLightData(self):
@@ -396,8 +410,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def loadScene(self):
         width, height = self.openGLWidget.width(), self.openGLWidget.height()
         view = max(width, height)
-        GL.glViewport(int((width - view) / 2), int((height - view) / 2),
-                      view, view)
+        GL.glViewport(int((width - view) / 2), int((height - view) / 2), view,
+                      view)
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
@@ -406,10 +420,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def updateMatrices(self):
         proj = QMatrix4x4()
+        coef = 0.01
+        center_x = 0
+        center_y = 0
+        projection = (-1 * coef + center_x, 1 * coef + center_x,
+                      -1 * coef + center_y, 1 * coef + center_y,
+                      2.8 * coef, 20)
         if self.perspectiveRadioButton.isChecked():
-            proj.frustum(-0.25, 0.25, -0.3, 0.2, 0.7, 20)
+            proj.frustum(*projection)
         else:
-            proj.ortho(-0.25, 0.25, -0.1, 0.4, 0.7, 20)
+            proj.ortho(*projection)
         modelview = QMatrix4x4()
         modelview.lookAt(self.camera_pos, self.camera_pos + self.camera_rot,
                          QVector3D(0, 1, 0))
@@ -421,17 +441,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shaders.setUniformValue("ambientStrength", self.ambient)
         self.shaders.setUniformValue("diffuseStrength", self.diffuse)
         self.shaders.setUniformValue("alpha", self.alpha)
+        self.shaders.setUniformValue("center", self.center)
+        self.shaders.setUniformValue("scale", self.scale_vec)
 
     def drawScene(self):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+        self.shaders.setUniformValue('scaleEnabled', False)
         self.shaders.setUniformValue('phongModel', False)
         self.drawPreparedPolygons(*self.light_data)
         if self.show_light_lines:
             self.drawPreparedLines(*self.light_lines_data)
+
+        self.shaders.setUniformValue('scaleEnabled', True)
         if self.show_grid:
             self.drawPreparedLines(*self.grid_data)
+
+        # self.drawPreparedLines(*self.normal_data)
         self.shaders.setUniformValue('phongModel', True)
         self.drawPreparedPolygons(*self.map_data)
+
         if self.show_contour:
             self.shaders.setUniformValue('phongModel', False)
             self.drawPreparedLineStrips(self.contour_data)
@@ -461,6 +489,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.xScaleSpinBox.valueChanged.connect(lambda x: self.scaleView(x=x))
         self.yScaleSpinBox.valueChanged.connect(lambda y: self.scaleView(y=y))
         self.zScaleSpinBox.valueChanged.connect(lambda z: self.scaleView(z=z))
+        self.realPropCheckBox.stateChanged.connect(
+            lambda: self.scaleView(y=self.yScaleSpinBox.value()))
 
         # Light
         self.ambientSlider.valueChanged.connect(lambda ambient: self.setLight(
@@ -564,11 +594,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.camera_pos.setY(self.camera_pos.y() + y * move_coef)
 
     @updateGL
+    @updateCameraInfo
     def scaleView(self, x=None, y=None, z=None):
         if x:
             self.scale_vec.setX(x)
         if y:
-            self.scale_vec.setY(y)
+            if self.realPropCheckBox.isChecked():
+                self.scale_vec.setY(y * self.real_prop)
+            else:
+                self.scale_vec.setY(y)
         if z:
             self.scale_vec.setZ(z)
 

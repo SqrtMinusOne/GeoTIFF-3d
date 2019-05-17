@@ -13,6 +13,10 @@ from .main_window import MainWindow
 __all__ = ['OpenDialog']
 
 
+def format_coords(coord):
+    return f"{coord:.6f}°"
+
+
 class OpenDialog(QMainWindow, Ui_OpenWindow):
     params_changed = pyqtSignal()
 
@@ -94,15 +98,27 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.lonSpin.setRange(lonmin, lonmax)
         self.latSpin.setValue((latmax - latmin) / 2 + latmin)
         self.lonSpin.setValue((lonmax - lonmin) / 2 + lonmin)
-        self.minLat.setText(f"{latmin:.6f}")
-        self.maxLat.setText(f"{latmax:.6f}")
-        self.minLon.setText(f"{lonmin:.6f}")
-        self.maxLon.setText(f"{lonmax:.6f}")
+        self.update_ranges()
+
+    def update_ranges(self, data=None):
+        data = self.processor.data if data is None else data
+        min_lon, max_lon, min_lat, max_lat = \
+            self.processor.get_centered_borders(data, (self.lon, self.lat))
+        min_val, max_val = self.processor.get_value_limits(data)
+
+        self.minLat.setText(format_coords(min_lat))
+        self.maxLat.setText(format_coords(max_lat))
+        self.minLon.setText(format_coords(min_lon))
+        self.maxLon.setText(format_coords(max_lon))
+        self.minAlt.setText(str(int(min_val)))
+        self.maxAlt.setText(str(int(max_val)))
 
     def on_preview(self):
         if not self.processor.data_plotted:
             self.init_matplotlib()
-        self.processor.draw_preview(**self.proc_params())
+        data = self.processor.modify_data(**self.proc_params())
+        self.update_ranges(data)
+        self.processor.draw_preview(data=data)
 
     def init_matplotlib(self):
         self.canvas = self.processor.init_canvas()
@@ -133,7 +149,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         """При нажатии на OK"""
         if self.thread is None:
             self.thread = self.processor.PreprocessThread(
-                self.processor, self, **self.proc_params())
+                self.processor, True, self, **self.proc_params())
             self.loading = LoadingWrapper(self.thread)
             self.thread.df_ready.connect(self.on_normals_ready)
             self.loading.start()
@@ -141,7 +157,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
     def on_normals_ready(self, df):
         self.thread = None
         pass_proc = GeoTIFFProcessor(
-            self.processor._modify_data(**self.proc_params()))
+            self.processor.modify_data(**self.proc_params()))
         self.window = MainWindow(pass_proc, df, self)
         self.window.show()
         self.hide()
