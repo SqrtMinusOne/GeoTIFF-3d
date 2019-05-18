@@ -146,6 +146,8 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         if self.autoUpdateCheckBox.isChecked() and self.processor.data_loaded:
             self.on_preview()
 
+        self.okButton.setEnabled(self.r != 0)
+
     def on_ok_pressed(self):
         """При нажатии на OK"""
         if self.thread is None:

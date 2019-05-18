@@ -49,6 +49,4 @@ for i in "${datas[@]}"; do
     final_datas="${final_datas} --add-data=${i}"
 done
 
-pyinstaller src/main.py --paths="${final_path:1}" --additional-hooks-dir=hooks/ ${final_datas:1} --name=${name} --onefile --noconsole
-
-# cp -r venv/lib/python3.6/site-packages/PyQt5/Qt/plugins/xcbglintegrations dist/main/PyQt5/Qt/plugins/
+pyinstaller src/main.py --paths="${final_path:1}" --additional-hooks-dir=hooks/ ${final_datas:1} --name=${name} --icon=res/logo-96px.ico
