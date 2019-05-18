@@ -1,4 +1,4 @@
-#version 320 es
+#version 300 es
 
 layout (location = 0) in vec3 VertexPosition;
 
