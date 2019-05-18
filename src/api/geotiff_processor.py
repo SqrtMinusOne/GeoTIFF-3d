@@ -7,6 +7,7 @@ from matplotlib.backends.backend_qt5agg import \
     FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
 from haversine import haversine, Unit
+from skimage.transform import resize
 
 from loading_wrapper import LoadingThread
 
@@ -29,10 +30,6 @@ class GeoTIFFProcessor:
 
         def run(self, df=None):
             def get_normal(p1, p2, p3):
-                # assert not ((p2[0] - p1[0] == p2[1] - p1[1] == 0) or
-                #            ((p3[0] - p1[0]) /
-                #             (p2[0] - p1[0]) == (p3[1] - p1[1]) /
-                #             (p2[1] - p1[1])))
                 p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
                 v1 = p3 - p1  # Эти векторы принадлежат плоскости
                 v2 = p2 - p1
@@ -87,6 +84,8 @@ class GeoTIFFProcessor:
         else:
             self.borders = self.get_borders(data)
             self.min_val, self.max_val = self.get_value_limits(data)
+        self._points_num = 0
+        self._center = 0, 0
         self.fig, self.ax = None, None
         self.canvas = None
 
@@ -123,8 +122,9 @@ class GeoTIFFProcessor:
         """
         data = self.data if data_ is None else data_
         xmin, xsize, xrot, ymax, yrot, ysize = data.geot
-        xlen = data.count(axis=0)[0] * xsize
-        ylen = data.count(axis=1)[0] * ysize
+        xlen, ylen = self.get_dimensions(data)
+        xlen = (xlen - 1) * xsize
+        ylen = (ylen - 1) * ysize
         xmax = xmin + xlen
         ymin = ymax + ylen
         return xmin, xmax, ymin, ymax
@@ -139,8 +139,10 @@ class GeoTIFFProcessor:
 
     def get_dimensions(self, data=None):
         data = self.data if data is None else data
-        xlen = data.count(axis=0)[0]
-        ylen = data.count(axis=1)[0]
+        xlen = data.raster.count(axis=0)[0] \
+            + np.ma.count_masked(data.raster, axis=0)[0]
+        ylen = data.raster.count(axis=1)[0] \
+            + np.ma.count_masked(data.raster, axis=1)[0]
         return xlen, ylen
 
     def get_value_limits(self, data=None):
@@ -160,7 +162,8 @@ class GeoTIFFProcessor:
             return 1
 
     def max_rad(self, lat, lon):
-        lonmin, lonmax, latmin, latmax = self.borders
+        lonmin, lonmax, latmin, latmax = self.get_centered_borders(
+            self.data, (lon, lat))
         radmax = min(abs(lat - latmin), abs(lon - lonmin), abs(lat - latmax),
                      abs(lon - lonmax))
         return radmax
@@ -175,10 +178,17 @@ class GeoTIFFProcessor:
         return (latmax - latmin) / 2 + latmin, \
             (lonmax - lonmin) / 2 + lonmin
 
-    def points_estimate(self, r, coef=1):
-        xlen, ylen = self.get_dimensions()
-        points = xlen * ylen
-        points *= (r / self.max_rad(*self.center))**2
+    def points_estimate(self, r=None, coef=1):
+        if self._points_num == 0:
+            xlen, ylen = self.get_dimensions()
+            self._points_num = xlen * ylen
+        if self._center == (0, 0):
+            self._center = self.center
+        points = self._points_num
+        if r is not None:
+            max_rad = self.max_rad(*self._center)
+            if r < max_rad:
+                points *= (r / self.max_rad(*self._center))**2
         points *= coef
         points = int(np.ceil(points))
         return points
@@ -245,10 +255,31 @@ class GeoTIFFProcessor:
         if lat and lon and r:
             data = self.data.extract(lon, lat, r)
         if coef != 1:
-            xlen, ylen = self.get_dimensions(data)
-            new_shape = (int(xlen * coef), int(ylen * coef))
-            data = data.resize(new_shape, cval=True)
+            data = self._resize_data(data, coef)
         return data
+
+    def _resize_data(self, data, coef):
+        xlen, ylen = self.get_dimensions(data)
+        new_shape = (int(xlen * coef), int(ylen * coef))
+        order = 0 if coef <= 1 else 1
+        raster2 = data.raster.copy()
+        raster2 = raster2.astype(float)
+        raster2[data.raster.mask] = np.nan
+        raster2 = resize(raster2, new_shape, order=order, mode='constant',
+                         cval=False)
+        raster2 = np.ma.masked_array(raster2, mask=np.isnan(raster2),
+                                     fill_value=data.raster.fill_value)
+        raster2 = raster2.astype(int)
+        raster2[raster2.mask] = data.nodata_value
+        raster2.mask = np.logical_or(np.isnan(raster2.data),
+                                     raster2.data == data.nodata_value)
+        geot = list(data.geot)
+        [geot[-1], geot[1]] = np.array([geot[-1], geot[1]]) \
+            * data.shape / new_shape
+        return gr.GeoRaster(raster2, tuple(geot),
+                            nodata_value=data.nodata_value,
+                            projection=data.projection,
+                            datatype=data.datatype)
 
     def _contour_cmap(self):
         cdict = {
@@ -309,7 +340,37 @@ class GeoTIFFProcessor:
 
     def extract_to_pandas(self, *args, **kwargs):
         data = self.modify_data(*args, **kwargs)
-        return data.to_pandas()
+        min_x, max_x, min_y, max_y = self.get_borders(data)
+        xlen, ylen = self.get_dimensions(data)
+        x_range = np.linspace(min_x, max_x, xlen)
+        y_range = np.linspace(min_y, max_y, ylen)
+        if data.x_cell_size < 0:
+            x_range = np.flip(x_range)
+        if data.y_cell_size < 0:
+            y_range = np.flip(y_range)
+        row_range = [i for i in range(xlen)]
+        col_range = [i for i in range(ylen)]
+        raster_replaced = np.ma.filled(data.raster, 0)
+        assert len(x_range) == len(y_range) == len(row_range) == len(col_range)
+        data = []
+        [
+            data.extend(
+                [
+                    (
+                        row,
+                        col,
+                        raster_replaced[row, col],
+                        x_range[col],
+                        y_range[row]
+                    )
+                    for col in col_range
+                ]
+            )
+            for row in row_range
+        ]
+        df = pd.DataFrame(data)
+        df.columns = 'row', 'col', 'value', 'x', 'y'
+        return df
 
     def calculate_normals(self, df, normalize=False):
         thread = self.PreprocessThread(self, normalize=normalize)
@@ -358,6 +419,8 @@ class GeoTIFFProcessor:
         self.data = gr.from_file(name)
         self.borders = self.get_borders(self.data)
         self.min_val, self.max_val = self.get_value_limits(self.data)
+        self._points_num = 0
+        self._center = (0, 0)
 
     def save(self, name, *args, **kwargs):
         if self.data_loaded:
