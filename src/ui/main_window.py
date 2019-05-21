@@ -148,7 +148,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # ==================== PREPARATION ====================
     def prepareScene(self):
-        """Prepare data for bufferization"""
+        """Prepare the data for bufferization"""
         self.coords_array = []
         self.colors = []
         self.normals = []

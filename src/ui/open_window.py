@@ -16,7 +16,7 @@ __all__ = ['OpenDialog']
 
 
 def format_coords(coord):
-    return f"{coord:.6f}°"
+    return f"{coord:.6f}"
 
 
 class OpenDialog(QMainWindow, Ui_OpenWindow):
@@ -41,7 +41,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.thread = None
 
     def connect_controls(self):
-        """Соединение элементов управление"""
+        """Connect all the controls in OpenDialog"""
 
         def slider_to_spin(spin):
             return lambda val: spin.setValue(val / 100)
@@ -79,7 +79,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         }
 
     def on_open(self):
-        """Выполнить при открытии файла"""
+        """Execute on open file"""
         name, filter_ = QFileDialog.getOpenFileName(
             self, 'Открыть файл', os.path.expanduser('~'), filter='*.tif')
         if len(name) > 0:
@@ -89,6 +89,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
             self.fileNameEdit.setText(name)
 
     def set_controls(self):
+        """Update controls in accordance to a loaded file"""
         lonmin, lonmax, latmin, latmax = self.processor.borders
         lonmin_, latmin_ = int(np.ceil(lonmin * 100)), int(
             np.ceil(latmin * 100))
@@ -102,6 +103,10 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.update_ranges()
 
     def update_ranges(self, data=None):
+        """Update ranges for an extracted data
+
+        :param data: GeoRaster
+        """
         data = self.processor.data if data is None else data
         min_lon, max_lon, min_lat, max_lat = \
             self.processor.get_centered_borders(data, (self.lon, self.lat))
@@ -130,7 +135,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.previewLayout.addWidget(self.nav_toolbar)
 
     def on_params_changed(self):
-        """При всяком изменении параметров
+        """Executed whenever a parameter is changed
         """
         points = self.processor.points_estimate(self.r, self.coef)
         self.pointNumber.setText(str(int(np.round(points))))
@@ -149,7 +154,6 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.okButton.setEnabled(self.r != 0)
 
     def on_ok_pressed(self):
-        """При нажатии на OK"""
         if self.thread is None:
             self.thread = self.processor.PreprocessThread(
                 self.processor, True, self, **self.proc_params())

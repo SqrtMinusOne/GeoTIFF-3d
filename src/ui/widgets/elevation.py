@@ -20,6 +20,7 @@ def getRect(widget):
 
 
 class ElevationSquare(QGraphicsItem):
+    """A red-green filled square with altitudes"""
     def __init__(self, start, end, levels, parent=None):
         super().__init__(parent)
         self.start, self.end = start, end
@@ -56,6 +57,8 @@ class ElevationSquare(QGraphicsItem):
 
 
 class CameraTri(QGraphicsItem):
+    """A triangle showing a level of the camera"""
+
     def __init__(self, start, end, pos, parent=None):
         super().__init__(parent)
         self.start, self.end = start, end
@@ -100,6 +103,9 @@ class CameraTri(QGraphicsItem):
 
 
 class ElevationGraphWidget(QGraphicsView):
+    """A widget to show an elevation of camera relative to the
+    given altitude"""
+
     def __init__(self, start, end, pos, width=240, height=240,
                  levels=None, parent=None):
         super().__init__(parent)
@@ -131,6 +137,8 @@ class ElevationGraphWidget(QGraphicsView):
         self.scene().addItem(self.tri)
 
     def updatePos(self, pos):
+        """Update a position of the camera
+        """
         self.tri.updatePos(int(pos))
         self.scene().update()
 

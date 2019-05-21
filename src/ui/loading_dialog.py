@@ -21,6 +21,8 @@ def format_delta(delta):
 
 
 class LoadingDialog(QDialog, Ui_LoadingDialog):
+    """A class to show nice loading dialog with ETA estimation and stuff"""
+
     def __init__(self, operation: str, total=0, parent=None):
         super().__init__(parent)
         self.setupUi(self)
@@ -57,6 +59,8 @@ class LoadingDialog(QDialog, Ui_LoadingDialog):
 
 
 class LoadingWrapper(QObject):
+    """This class runs a LoadingThread and shows the process
+    in a LoadingDialog"""
     loadingDone = pyqtSignal()
 
     def __init__(self, thread: LoadingThread, parent=None):

@@ -15,23 +15,9 @@ def getRect(widget):
     return QRect(offset, offset, w - offset * 2, h - offset * 2)
 
 
-class MapRect(QGraphicsItem):
-    def __init__(self, processor, parent=None):
-        super().__init__(parent)
-        self.processor = processor
-        self.rect = QRect(10, 10, 90, 90)
-        self.setZValue(10)
-
-    def paint(self, painter: QPainter, option, widget=None):
-        self.rect = getRect(widget)
-        painter.setPen(QPen(Qt.black, 0))
-        painter.drawRect(self.rect)
-
-    def boundingRect(self):
-        return QRectF(self.rect)
-
-
 class CameraItem(QGraphicsItem):
+    """An item to show a camera and it's angle"""
+
     def __init__(self, processor, pos: QVector3D, rot: QVector3D, parent=None):
         super().__init__(parent)
         self.processor = processor
@@ -96,6 +82,8 @@ class CameraItem(QGraphicsItem):
 
 
 class MinimapGraphWidget(QGraphicsView):
+    """The widget to show a minimap with a camera position"""
+
     def __init__(self,
                  processor,
                  position: QVector3D,
