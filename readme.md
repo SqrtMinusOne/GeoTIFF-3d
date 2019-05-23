@@ -6,7 +6,7 @@ A simple program to visualize GeoTIFF files with Matplotlib and OpenGL.
 You can download GeoTIFF data from http://srtm.csi.cgiar.org/srtmdata/
 
 # Install
-There is a .deb for Bionic & amd64. For any other platform, [Compile from sources](https://github.com/SqrtMinusOne/GeoTIFF-3d/wiki/Installation-from-sources)
+There is a .deb for Bionic-amd64 and an installer for Win10-x32. For any other platform, [Compile from sources](https://github.com/SqrtMinusOne/GeoTIFF-3d/wiki/Installation-from-sources)
 
 # Screenshots
 ![Screenshot 1](/docs/pictures/screenshot1.png?raw=true)
