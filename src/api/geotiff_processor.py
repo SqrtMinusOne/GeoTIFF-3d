@@ -202,8 +202,9 @@ class GeoTIFFProcessor:
         :param lat:
         :param lon:
         """
-        lonmin, lonmax, latmin, latmax = self.get_centered_borders(
-            self.data, (lon, lat))
+        # lonmin, lonmax, latmin, latmax = self.get_centered_borders(
+        #     self.data, (lon, lat))
+        lonmin, lonmax, latmin, latmax = self.get_borders()
         radmax = min(abs(lat - latmin), abs(lon - lonmin), abs(lat - latmax),
                      abs(lon - lonmax))
         return radmax

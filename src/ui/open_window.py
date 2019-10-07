@@ -27,17 +27,18 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.setupUi(self)
         self.splitter.setStretchFactor(0, 2)
         self.splitter.setStretchFactor(1, 4)
+        self.isSquareLabel.setVisible(False)
 
         self.openButton.clicked.connect(self.on_open)
         self.previewButton.clicked.connect(self.on_preview)
         self.saveButton.clicked.connect(self.on_save)
         self.connect_controls()
-        self.params_changed.connect(self.set_rad_control)
         self.params_changed.connect(self.on_params_changed)
         self.okButton.clicked.connect(self.on_ok_pressed)
         self.processor = GeoTIFFProcessor()
         self.lon, self.lat, self.r = 0., 0., 0.
         self.coef = 1.
+        self.is_square = True
         self.thread = None
 
     def connect_controls(self):
@@ -123,6 +124,9 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         if not self.processor.data_plotted:
             self.init_matplotlib()
         data = self.processor.modify_data(**self.proc_params())
+        xlen, ylen = self.processor.get_dimensions(data)
+        self.is_square = xlen == ylen
+        self.isSquareLabel.setVisible(not self.is_square)
         self.update_ranges(data)
         self.processor.draw_preview(data=data)
 
@@ -137,6 +141,7 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
     def on_params_changed(self):
         """Executed whenever a parameter is changed
         """
+        self.set_rad_control()
         points = self.processor.points_estimate(self.r, self.coef)
         self.pointNumber.setText(str(int(np.round(points))))
 
@@ -154,7 +159,8 @@ class OpenDialog(QMainWindow, Ui_OpenWindow):
         self.okButton.setEnabled(self.r != 0)
 
     def on_ok_pressed(self):
-        if self.thread is None:
+        self.on_preview()
+        if self.thread is None and self.is_square:
             self.thread = self.processor.PreprocessThread(
                 self.processor, True, self, **self.proc_params())
             self.loading = LoadingWrapper(self.thread)
