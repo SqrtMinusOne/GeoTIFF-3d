@@ -3,7 +3,7 @@
 
 A simple program to visualize GeoTIFF files with Matplotlib and OpenGL. 
 
-You can download GeoTIFF data from http://srtm.csi.cgiar.org/srtmdata/
+You can download GeoTIFF data from http://srtm.csi.cgiar.org/srtmdata/. There is an Everest GeoTIFF in the `samples` directory
 
 # Install
 There is a .deb for Bionic-amd64 and an installer for Win10-x32. For any other platform, [Compile from sources](https://github.com/SqrtMinusOne/GeoTIFF-3d/wiki/Installation-from-sources)
